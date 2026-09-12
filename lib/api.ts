@@ -118,6 +118,20 @@ export const geoApi = {
     request<Municipality[]>(`/geo/prefectures/${prefectureId}/municipalities`),
 };
 
+// Static GeoJSON boundary files — no auth needed, not routed through request().
+export const geoFilesApi = {
+  prefectures: async (): Promise<GeoJSON.FeatureCollection> => {
+    const res = await fetch(`${BASE_URL}/geo/files/prefectures.geojson`);
+    if (!res.ok) throw new ApiError(res.status, "Failed to load prefecture boundaries");
+    return res.json();
+  },
+  municipalities: async (prefectureId: number): Promise<GeoJSON.FeatureCollection> => {
+    const res = await fetch(`${BASE_URL}/geo/files/municipalities/${prefectureId}.geojson`);
+    if (!res.ok) throw new ApiError(res.status, "Failed to load municipality boundaries");
+    return res.json();
+  },
+};
+
 export type VisitStatus = "visited" | "want_to_go";
 
 export interface VisitPhoto {

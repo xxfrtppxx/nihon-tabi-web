@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
-import { geoApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
+import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { VisitEditor } from "@/components/visit-editor";
 import type { FlyToTarget } from "@/components/map-view";
@@ -38,6 +38,20 @@ export default function MapPage() {
     enabled: !!user,
   });
 
+  const prefecturesGeoJSONQuery = useQuery({
+    queryKey: ["geo-files", "prefectures"],
+    queryFn: geoFilesApi.prefectures,
+    enabled: !!user,
+    staleTime: Infinity,
+  });
+
+  const municipalitiesGeoJSONQuery = useQuery({
+    queryKey: ["geo-files", "municipalities", prefectureId],
+    queryFn: () => geoFilesApi.municipalities(prefectureId!),
+    enabled: !!user && prefectureId !== null,
+    staleTime: Infinity,
+  });
+
   const visitByMunicipalityId = useMemo(() => {
     const map = new Map<number, Visit>();
     for (const visit of visitsQuery.data ?? []) {
@@ -46,11 +60,42 @@ export default function MapPage() {
     return map;
   }, [visitsQuery.data]);
 
+  const visitedMunicipalityIds = useMemo(
+    () =>
+      (visitsQuery.data ?? [])
+        .filter((v) => v.status === "visited")
+        .map((v) => v.municipalityId),
+    [visitsQuery.data],
+  );
+  const wantMunicipalityIds = useMemo(
+    () =>
+      (visitsQuery.data ?? [])
+        .filter((v) => v.status === "want_to_go")
+        .map((v) => v.municipalityId),
+    [visitsQuery.data],
+  );
+  const visitedPrefectureIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (visitsQuery.data ?? [])
+            .filter((v) => v.status === "visited")
+            .map((v) => v.municipality.prefectureId),
+        ),
+      ),
+    [visitsQuery.data],
+  );
+
   const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
   const flyTo: FlyToTarget | null =
     selectedPrefecture?.centroidLat != null && selectedPrefecture?.centroidLng != null
       ? { lat: selectedPrefecture.centroidLat, lng: selectedPrefecture.centroidLng }
       : null;
+
+  function handleMunicipalityPolygonClick(id: number) {
+    const municipality = municipalitiesQuery.data?.find((m) => m.id === id);
+    if (municipality) setActiveMunicipality(municipality);
+  }
 
   if (loading || !user) return null;
 
@@ -119,7 +164,17 @@ export default function MapPage() {
       </aside>
 
       <main className="relative flex-1">
-        <MapView flyTo={flyTo} />
+        <MapView
+          flyTo={flyTo}
+          prefecturesGeoJSON={prefecturesGeoJSONQuery.data ?? null}
+          municipalitiesGeoJSON={municipalitiesGeoJSONQuery.data ?? null}
+          visitedPrefectureIds={visitedPrefectureIds}
+          visitedMunicipalityIds={visitedMunicipalityIds}
+          wantMunicipalityIds={wantMunicipalityIds}
+          selectedPrefectureId={prefectureId}
+          onPrefectureClick={setPrefectureId}
+          onMunicipalityClick={handleMunicipalityPolygonClick}
+        />
       </main>
 
       {activeMunicipality && (
