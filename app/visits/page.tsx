@@ -1,0 +1,67 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { visitsApi } from "@/lib/api";
+import { useRequireAuth } from "@/hooks/use-require-auth";
+
+export default function VisitsPage() {
+  const { user, loading } = useRequireAuth();
+  const visitsQuery = useQuery({
+    queryKey: ["visits"],
+    queryFn: () => visitsApi.list(),
+    enabled: !!user,
+  });
+
+  if (loading || !user) return null;
+
+  return (
+    <main className="mx-auto max-w-2xl px-6 py-8">
+      <h1 className="mb-6 text-2xl font-bold">รายการที่ไปแล้ว</h1>
+
+      {visitsQuery.isLoading && <p>กำลังโหลด...</p>}
+      {visitsQuery.data?.length === 0 && (
+        <p className="text-neutral-500">
+          ยังไม่มีรายการ — ไปหน้าแผนที่แล้วเลือกเมืองเพื่อบันทึกได้เลย
+        </p>
+      )}
+
+      <ul className="flex flex-col gap-3">
+        {visitsQuery.data?.map((visit) => (
+          <li
+            key={visit.id}
+            className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold">
+                  {visit.municipality.nameJa}{" "}
+                  <span className="text-sm font-normal text-neutral-500">
+                    {visit.municipality.prefecture.nameJa}
+                  </span>
+                </p>
+                {visit.visitedOn && (
+                  <p className="text-sm text-neutral-500">
+                    {new Date(visit.visitedOn).toLocaleDateString("th-TH")}
+                  </p>
+                )}
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  visit.status === "visited"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                }`}
+              >
+                {visit.status === "visited" ? "ไปแล้ว" : "อยากไป"}
+              </span>
+            </div>
+            {visit.rating ? (
+              <p className="mt-1 text-amber-500">{"★".repeat(visit.rating)}</p>
+            ) : null}
+            {visit.note && <p className="mt-2 text-sm">{visit.note}</p>}
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}
