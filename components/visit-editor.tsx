@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { visitsApi, type Municipality, type Visit, type VisitStatus } from "@/lib/api";
-import { placeName } from "@/lib/format";
+import { formatDate, placeName } from "@/lib/format";
 
 export function VisitEditor({
   municipality,
@@ -21,6 +21,7 @@ export function VisitEditor({
   const [visitedOn, setVisitedOn] = useState(existingVisit?.visitedOn ?? "");
   const [note, setNote] = useState(existingVisit?.note ?? "");
   const [rating, setRating] = useState(existingVisit?.rating ?? 0);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["visits"] });
@@ -86,12 +87,30 @@ export function VisitEditor({
 
           <label className="flex flex-col gap-1 text-sm">
             Date visited
-            <input
-              type="date"
-              value={visitedOn ?? ""}
-              onChange={(e) => setVisitedOn(e.target.value)}
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
-            />
+            <div className="relative">
+              {/* Native date input drives the real value and supplies the
+                  calendar popup, but its own displayed text follows the
+                  browser's locale (often mm/dd/yyyy) rather than dd/MM/yyyy —
+                  so it's kept invisible and a formatted text field sits on
+                  top, opening the same picker on click. */}
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={visitedOn ?? ""}
+                onChange={(e) => setVisitedOn(e.target.value)}
+                tabIndex={-1}
+                aria-hidden
+                className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+              />
+              <input
+                type="text"
+                readOnly
+                value={visitedOn ? formatDate(visitedOn) : ""}
+                placeholder="dd/mm/yyyy"
+                onClick={() => dateInputRef.current?.showPicker?.()}
+                className="w-full cursor-pointer rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+              />
+            </div>
           </label>
 
           <label className="flex flex-col gap-1 text-sm">

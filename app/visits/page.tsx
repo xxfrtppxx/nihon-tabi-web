@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { visitsApi } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { placeName } from "@/lib/format";
+import { formatDate, placeName } from "@/lib/format";
 
 export default function VisitsPage() {
   const { user, loading } = useRequireAuth();
@@ -45,7 +45,7 @@ export default function VisitsPage() {
                 </p>
                 {visit.visitedOn && (
                   <p className="text-sm text-neutral-500">
-                    {new Date(visit.visitedOn).toLocaleDateString("en-US")}
+                    {formatDate(visit.visitedOn)}
                   </p>
                 )}
               </div>
