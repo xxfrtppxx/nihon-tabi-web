@@ -6,8 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { placeName } from "@/lib/format";
+import { boundsOfFeatureCollection, type LngLatBounds } from "@/lib/geo";
 import { VisitEditor } from "@/components/visit-editor";
-import type { FlyToTarget } from "@/components/map-view";
 
 const MapView = dynamic(
   () => import("@/components/map-view").then((mod) => mod.MapView),
@@ -17,9 +17,10 @@ const MapView = dynamic(
 export default function MapPage() {
   const { user, loading } = useRequireAuth();
   const [prefectureId, setPrefectureId] = useState<number | null>(null);
-  const [activeMunicipality, setActiveMunicipality] = useState<Municipality | null>(
+  const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(
     null,
   );
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   const prefecturesQuery = useQuery({
     queryKey: ["prefectures"],
@@ -112,8 +113,8 @@ export default function MapPage() {
     const nameById = new Map(
       municipalitiesQuery.data.map((m) => [m.id, placeName(m.nameEn, m.nameJa)]),
     );
-    const features = activeMunicipality
-      ? geojson.features.filter((f) => f.properties?.id === activeMunicipality.id)
+    const features = selectedMunicipality
+      ? geojson.features.filter((f) => f.properties?.id === selectedMunicipality.id)
       : geojson.features;
     return {
       ...geojson,
@@ -122,17 +123,34 @@ export default function MapPage() {
         properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
       })),
     };
-  }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data, activeMunicipality]);
+  }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data, selectedMunicipality]);
 
-  const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
-  const flyTo: FlyToTarget | null =
-    selectedPrefecture?.centroidLat != null && selectedPrefecture?.centroidLng != null
-      ? { lat: selectedPrefecture.centroidLat, lng: selectedPrefecture.centroidLng }
-      : null;
+  // Fit to whichever is the more specific current selection: a picked
+  // municipality first, else the picked prefecture, else the whole country.
+  const fitBounds: LngLatBounds | null = useMemo(() => {
+    if (selectedMunicipality && municipalitiesGeoJSONWithNames) {
+      return boundsOfFeatureCollection(municipalitiesGeoJSONWithNames);
+    }
+    if (prefectureId !== null && prefecturesGeoJSONWithNames) {
+      return boundsOfFeatureCollection(prefecturesGeoJSONWithNames);
+    }
+    return null;
+  }, [selectedMunicipality, municipalitiesGeoJSONWithNames, prefectureId, prefecturesGeoJSONWithNames]);
+
+  function selectPrefecture(id: number) {
+    setPrefectureId(id);
+    setSelectedMunicipality(null);
+    setIsEditorOpen(false);
+  }
+
+  function selectMunicipality(m: Municipality) {
+    setSelectedMunicipality(m);
+    setIsEditorOpen(true);
+  }
 
   function handleMunicipalityPolygonClick(id: number) {
     const municipality = municipalitiesQuery.data?.find((m) => m.id === id);
-    if (municipality) setActiveMunicipality(municipality);
+    if (municipality) selectMunicipality(municipality);
   }
 
   if (loading || !user) return null;
@@ -145,7 +163,11 @@ export default function MapPage() {
             <h2 className="text-sm font-semibold text-neutral-500">จังหวัด</h2>
             {prefectureId !== null && (
               <button
-                onClick={() => setPrefectureId(null)}
+                onClick={() => {
+                  setPrefectureId(null);
+                  setSelectedMunicipality(null);
+                  setIsEditorOpen(false);
+                }}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
                 ดูทั้งประเทศ
@@ -162,7 +184,7 @@ export default function MapPage() {
             {prefecturesQuery.data?.map((pref) => (
               <li key={pref.id}>
                 <button
-                  onClick={() => setPrefectureId(pref.id)}
+                  onClick={() => selectPrefecture(pref.id)}
                   className={`w-full rounded px-3 py-1.5 text-left text-sm ${
                     prefectureId === pref.id
                       ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
@@ -178,7 +200,20 @@ export default function MapPage() {
 
         {prefectureId !== null && (
           <div>
-            <h2 className="mb-2 text-sm font-semibold text-neutral-500">เมือง/เขต</h2>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-neutral-500">เมือง/เขต</h2>
+              {selectedMunicipality !== null && (
+                <button
+                  onClick={() => {
+                    setSelectedMunicipality(null);
+                    setIsEditorOpen(false);
+                  }}
+                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  ดูทั้งจังหวัด
+                </button>
+              )}
+            </div>
             {municipalitiesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
             <ul className="flex flex-col gap-1">
               {municipalitiesQuery.data?.map((m) => {
@@ -186,8 +221,12 @@ export default function MapPage() {
                 return (
                   <li key={m.id}>
                     <button
-                      onClick={() => setActiveMunicipality(m)}
-                      className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      onClick={() => selectMunicipality(m)}
+                      className={`flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-sm ${
+                        selectedMunicipality?.id === m.id
+                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                          : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      }`}
                     >
                       <span>{placeName(m.nameEn, m.nameJa)}</span>
                       {visit && (
@@ -212,23 +251,23 @@ export default function MapPage() {
 
       <main className="relative flex-1">
         <MapView
-          flyTo={flyTo}
+          fitBounds={fitBounds}
           prefecturesGeoJSON={prefecturesGeoJSONWithNames}
           municipalitiesGeoJSON={municipalitiesGeoJSONWithNames}
           visitedPrefectureIds={visitedPrefectureIds}
           visitedMunicipalityIds={visitedMunicipalityIds}
           wantMunicipalityIds={wantMunicipalityIds}
           selectedPrefectureId={prefectureId}
-          onPrefectureClick={setPrefectureId}
+          onPrefectureClick={selectPrefecture}
           onMunicipalityClick={handleMunicipalityPolygonClick}
         />
       </main>
 
-      {activeMunicipality && (
+      {isEditorOpen && selectedMunicipality && (
         <VisitEditor
-          municipality={activeMunicipality}
-          existingVisit={visitByMunicipalityId.get(activeMunicipality.id)}
-          onClose={() => setActiveMunicipality(null)}
+          municipality={selectedMunicipality}
+          existingVisit={visitByMunicipalityId.get(selectedMunicipality.id)}
+          onClose={() => setIsEditorOpen(false)}
         />
       )}
     </div>

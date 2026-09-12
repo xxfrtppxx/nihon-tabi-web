@@ -38,13 +38,8 @@ const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
 const NEUTRAL_COLOR = "#94a3b8";
 
-export interface FlyToTarget {
-  lng: number;
-  lat: number;
-}
-
 export function MapView({
-  flyTo,
+  fitBounds,
   prefecturesGeoJSON,
   municipalitiesGeoJSON,
   visitedPrefectureIds,
@@ -54,7 +49,7 @@ export function MapView({
   onPrefectureClick,
   onMunicipalityClick,
 }: {
-  flyTo: FlyToTarget | null;
+  fitBounds: [[number, number], [number, number]] | null;
   prefecturesGeoJSON: GeoJSON.FeatureCollection | null;
   municipalitiesGeoJSON: GeoJSON.FeatureCollection | null;
   visitedPrefectureIds: number[];
@@ -65,20 +60,20 @@ export function MapView({
   onMunicipalityClick: (id: number) => void;
 }) {
   const mapRef = useRef<MapRef>(null);
-  const hasFlownRef = useRef(false);
+  const hasFitRef = useRef(false);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (flyTo) {
-      map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: 9, duration: 1000 });
-      hasFlownRef.current = true;
-    } else if (hasFlownRef.current) {
-      // Prefecture got deselected — fly back out to the whole-country view
+    if (fitBounds) {
+      map.fitBounds(fitBounds, { padding: 40, duration: 1000 });
+      hasFitRef.current = true;
+    } else if (hasFitRef.current) {
+      // Selection got cleared — fit back out to the whole-country view
       // instead of leaving the camera wherever it last was.
       map.fitBounds(JAPAN_BOUNDS, { padding: 24, duration: 1000 });
     }
-  }, [flyTo]);
+  }, [fitBounds]);
 
   function handleClick(e: MapLayerMouseEvent) {
     const feature = e.features?.[0];
