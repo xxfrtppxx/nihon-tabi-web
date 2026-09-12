@@ -47,8 +47,9 @@ const LABEL_FONT = ["Noto Sans Regular"];
 // showing more detail as you zoom in — no selection required.
 const DETAIL_ZOOM = 6;
 // Cap how many prefectures' municipality data we'll load at once for that
-// preview, in case a wide, zoomed-in-enough view spans many small ones.
-const MAX_PREVIEW_PREFECTURES = 8;
+// preview. There are only 47 total, so this is just a safety ceiling, not
+// a real limit — it must never cut off prefectures actually on screen.
+const MAX_PREVIEW_PREFECTURES = 47;
 
 const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
@@ -83,16 +84,25 @@ export function MapView({
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFitRef = useRef(false);
+  // Whatever the map is currently fit to (a selection's bounds, or the
+  // whole country) — kept so a container resize can redo the same fit
+  // instead of leaving the old view letterboxed or cropped.
+  const currentFitRef = useRef<{
+    bounds: [[number, number], [number, number]];
+    padding: number;
+  }>({ bounds: JAPAN_BOUNDS, padding: 24 });
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     if (fitBounds) {
+      currentFitRef.current = { bounds: fitBounds, padding: 40 };
       map.fitBounds(fitBounds, { padding: 40, duration: 1000 });
       hasFitRef.current = true;
     } else if (hasFitRef.current) {
       // Selection got cleared — fit back out to the whole-country view
       // instead of leaving the camera wherever it last was.
+      currentFitRef.current = { bounds: JAPAN_BOUNDS, padding: 24 };
       map.fitBounds(JAPAN_BOUNDS, { padding: 24, duration: 1000 });
     }
   }, [fitBounds]);
@@ -112,7 +122,24 @@ export function MapView({
   // but never back out past the starting view.
   function handleLoad() {
     const map = mapRef.current?.getMap();
-    if (map) map.setMinZoom(map.getZoom());
+    if (!map) return;
+    map.setMinZoom(map.getZoom());
+
+    // The container isn't always the same size (window resize, orientation
+    // change, sidebar toggling) — redo the current fit whenever it changes
+    // so the map always fills 100% of it instead of leaving stale
+    // letterboxing from whatever size it was last fit at.
+    map.on("resize", () => {
+      const countryCamera = map.cameraForBounds(JAPAN_BOUNDS, { padding: 24 });
+      if (countryCamera && typeof countryCamera.zoom === "number" && Number.isFinite(countryCamera.zoom)) {
+        // A very narrow or short container can compute a zoom outside
+        // maplibre's own valid range — clamp instead of letting setMinZoom throw.
+        const clamped = Math.min(Math.max(countryCamera.zoom, -2), map.getMaxZoom());
+        map.setMinZoom(clamped);
+      }
+      const { bounds, padding } = currentFitRef.current;
+      map.fitBounds(bounds, { padding, duration: 0 });
+    });
   }
 
   // Zooming in on the country view without picking a prefecture first
