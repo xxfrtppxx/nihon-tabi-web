@@ -86,6 +86,32 @@ export default function MapPage() {
     [visitsQuery.data],
   );
 
+  const prefecturesGeoJSONWithNames = useMemo(() => {
+    const geojson = prefecturesGeoJSONQuery.data;
+    if (!geojson || !prefecturesQuery.data) return null;
+    const nameById = new Map(prefecturesQuery.data.map((p) => [p.id, p.nameJa]));
+    return {
+      ...geojson,
+      features: geojson.features.map((f) => ({
+        ...f,
+        properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
+      })),
+    };
+  }, [prefecturesGeoJSONQuery.data, prefecturesQuery.data]);
+
+  const municipalitiesGeoJSONWithNames = useMemo(() => {
+    const geojson = municipalitiesGeoJSONQuery.data;
+    if (!geojson || !municipalitiesQuery.data) return null;
+    const nameById = new Map(municipalitiesQuery.data.map((m) => [m.id, m.nameJa]));
+    return {
+      ...geojson,
+      features: geojson.features.map((f) => ({
+        ...f,
+        properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
+      })),
+    };
+  }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data]);
+
   const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
   const flyTo: FlyToTarget | null =
     selectedPrefecture?.centroidLat != null && selectedPrefecture?.centroidLng != null
@@ -166,8 +192,8 @@ export default function MapPage() {
       <main className="relative flex-1">
         <MapView
           flyTo={flyTo}
-          prefecturesGeoJSON={prefecturesGeoJSONQuery.data ?? null}
-          municipalitiesGeoJSON={municipalitiesGeoJSONQuery.data ?? null}
+          prefecturesGeoJSON={prefecturesGeoJSONWithNames}
+          municipalitiesGeoJSON={municipalitiesGeoJSONWithNames}
           visitedPrefectureIds={visitedPrefectureIds}
           visitedMunicipalityIds={visitedMunicipalityIds}
           wantMunicipalityIds={wantMunicipalityIds}

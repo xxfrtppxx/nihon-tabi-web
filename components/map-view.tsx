@@ -8,9 +8,27 @@ import Map, {
   type MapLayerMouseEvent,
   type MapRef,
 } from "react-map-gl/maplibre";
+import type { StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const JAPAN_VIEW = { longitude: 138.25, latitude: 36.5, zoom: 4.5 };
+
+// No basemap — just a flat background. We only want our own boundary
+// polygons on screen, not OpenFreeMap's streets/labels underneath them.
+const BLANK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {},
+  glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#f8fafc" },
+    },
+  ],
+};
+
+const LABEL_FONT = ["Noto Sans Regular"];
 
 const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
@@ -62,7 +80,7 @@ export function MapView({
     <Map
       ref={mapRef}
       initialViewState={JAPAN_VIEW}
-      mapStyle="https://tiles.openfreemap.org/styles/liberty"
+      mapStyle={BLANK_STYLE}
       style={{ width: "100%", height: "100%" }}
       interactiveLayerIds={["prefectures-fill", "municipalities-fill"]}
       onClick={handleClick}
@@ -95,6 +113,20 @@ export function MapView({
             filter={["==", ["get", "id"], selectedPrefectureId ?? -1]}
             paint={{ "line-color": "#2563eb", "line-width": 3 }}
           />
+          <Layer
+            id="prefectures-label"
+            type="symbol"
+            layout={{
+              "text-field": ["get", "name"],
+              "text-font": LABEL_FONT,
+              "text-size": 13,
+            }}
+            paint={{
+              "text-color": "#1e293b",
+              "text-halo-color": "#f8fafc",
+              "text-halo-width": 1.5,
+            }}
+          />
         </Source>
       )}
 
@@ -119,6 +151,20 @@ export function MapView({
             id="municipalities-line"
             type="line"
             paint={{ "line-color": "#1e293b", "line-width": 1 }}
+          />
+          <Layer
+            id="municipalities-label"
+            type="symbol"
+            layout={{
+              "text-field": ["get", "name"],
+              "text-font": LABEL_FONT,
+              "text-size": 11,
+            }}
+            paint={{
+              "text-color": "#1e293b",
+              "text-halo-color": "#f8fafc",
+              "text-halo-width": 1.5,
+            }}
           />
         </Source>
       )}
