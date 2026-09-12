@@ -11,7 +11,11 @@ import Map, {
 import type { StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-const JAPAN_VIEW = { longitude: 138.25, latitude: 36.5, zoom: 4.5 };
+// Japan's full extent (mainland + Okinawa), from the GADM dataset's own bounds.
+const JAPAN_BOUNDS: [[number, number], [number, number]] = [
+  [122.7, 23.8],
+  [154.3, 45.7],
+];
 
 // No basemap — just a flat background. We only want our own boundary
 // polygons on screen, not OpenFreeMap's streets/labels underneath them.
@@ -76,14 +80,23 @@ export function MapView({
     else if (feature!.layer.id === "prefectures-fill") onPrefectureClick(id);
   }
 
+  // The "whole country" fit is itself the zoomed-out limit — pin minZoom to
+  // whatever zoom fitBounds actually lands on, so users can zoom in freely
+  // but never back out past the starting view.
+  function handleLoad() {
+    const map = mapRef.current?.getMap();
+    if (map) map.setMinZoom(map.getZoom());
+  }
+
   return (
     <Map
       ref={mapRef}
-      initialViewState={JAPAN_VIEW}
+      initialViewState={{ bounds: JAPAN_BOUNDS, fitBoundsOptions: { padding: 24 } }}
       mapStyle={BLANK_STYLE}
       style={{ width: "100%", height: "100%" }}
       interactiveLayerIds={["prefectures-fill", "municipalities-fill"]}
       onClick={handleClick}
+      onLoad={handleLoad}
     >
       <NavigationControl position="top-right" />
 
