@@ -16,6 +16,14 @@ const JAPAN_BOUNDS: [[number, number], [number, number]] = [
   [122.7, 23.8],
   [154.3, 45.7],
 ];
+// Same bounds, flattened — maplibre's `maxBounds` prop wants [w, s, e, n]
+// rather than the [[w,s],[e,n]] pair form `fitBounds` takes.
+const JAPAN_MAX_BOUNDS: [number, number, number, number] = [
+  JAPAN_BOUNDS[0][0],
+  JAPAN_BOUNDS[0][1],
+  JAPAN_BOUNDS[1][0],
+  JAPAN_BOUNDS[1][1],
+];
 
 // No basemap — just a flat background. We only want our own boundary
 // polygons on screen, not OpenFreeMap's streets/labels underneath them.
@@ -33,6 +41,11 @@ const BLANK_STYLE: StyleSpecification = {
 };
 
 const LABEL_FONT = ["Noto Sans Regular"];
+
+// Zoom level past which "no prefecture selected yet" should still resolve
+// to whatever prefecture is under the middle of the screen, instead of
+// leaving the municipality layer empty until the user picks one explicitly.
+const AUTO_SELECT_ZOOM = 6;
 
 const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
@@ -91,15 +104,34 @@ export function MapView({
     if (map) map.setMinZoom(map.getZoom());
   }
 
+  // Scrolling/pinching in on the blank country view (without clicking a
+  // prefecture first) should still resolve to whatever prefecture ends up
+  // under the middle of the screen, instead of showing nothing until the
+  // user picks one from the list.
+  function handleMoveEnd() {
+    if (selectedPrefectureId !== null) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    if (map.getZoom() < AUTO_SELECT_ZOOM) return;
+    const center = map.project(map.getCenter());
+    const [feature] = map.queryRenderedFeatures([center.x, center.y], {
+      layers: ["prefectures-fill"],
+    });
+    const id = feature?.properties?.id;
+    if (typeof id === "number") onPrefectureClick(id);
+  }
+
   return (
     <Map
       ref={mapRef}
       initialViewState={{ bounds: JAPAN_BOUNDS, fitBoundsOptions: { padding: 24 } }}
+      maxBounds={JAPAN_MAX_BOUNDS}
       mapStyle={BLANK_STYLE}
       style={{ width: "100%", height: "100%" }}
       interactiveLayerIds={["prefectures-fill", "municipalities-fill"]}
       onClick={handleClick}
       onLoad={handleLoad}
+      onMoveEnd={handleMoveEnd}
     >
       <NavigationControl position="top-right" />
 
