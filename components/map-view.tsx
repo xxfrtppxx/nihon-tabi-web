@@ -65,10 +65,18 @@ export function MapView({
   onMunicipalityClick: (id: number) => void;
 }) {
   const mapRef = useRef<MapRef>(null);
+  const hasFlownRef = useRef(false);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
     if (flyTo) {
-      mapRef.current?.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: 9, duration: 1000 });
+      map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: 9, duration: 1000 });
+      hasFlownRef.current = true;
+    } else if (hasFlownRef.current) {
+      // Prefecture got deselected — fly back out to the whole-country view
+      // instead of leaving the camera wherever it last was.
+      map.fitBounds(JAPAN_BOUNDS, { padding: 24, duration: 1000 });
     }
   }, [flyTo]);
 

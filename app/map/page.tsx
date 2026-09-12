@@ -141,7 +141,17 @@ export default function MapPage() {
     <div className="flex h-[calc(100vh-57px)]">
       <aside className="flex w-80 flex-col gap-4 overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
         <div>
-          <h2 className="mb-2 text-sm font-semibold text-neutral-500">จังหวัด</h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-neutral-500">จังหวัด</h2>
+            {prefectureId !== null && (
+              <button
+                onClick={() => setPrefectureId(null)}
+                className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                ดูทั้งประเทศ
+              </button>
+            )}
+          </div>
           {prefecturesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
           {prefecturesQuery.data?.length === 0 && (
             <p className="text-sm text-neutral-500">
