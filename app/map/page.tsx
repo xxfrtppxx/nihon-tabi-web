@@ -94,8 +94,11 @@ export default function MapPage() {
     const nameById = new Map(
       prefecturesQuery.data.map((p) => [p.id, placeName(p.nameEn, p.nameJa)]),
     );
-    const features =
-      prefectureId === null
+    // Once a municipality is picked, the prefecture polygon is redundant —
+    // drop it entirely so only the municipality's own polygon shows.
+    const features = selectedMunicipality
+      ? []
+      : prefectureId === null
         ? geojson.features
         : geojson.features.filter((f) => f.properties?.id === prefectureId);
     return {
@@ -105,7 +108,12 @@ export default function MapPage() {
         properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
       })),
     };
-  }, [prefecturesGeoJSONQuery.data, prefecturesQuery.data, prefectureId]);
+  }, [
+    prefecturesGeoJSONQuery.data,
+    prefecturesQuery.data,
+    prefectureId,
+    selectedMunicipality,
+  ]);
 
   const municipalitiesGeoJSONWithNames = useMemo(() => {
     const geojson = municipalitiesGeoJSONQuery.data;
