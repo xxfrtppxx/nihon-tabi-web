@@ -14,6 +14,12 @@ const MapView = dynamic(
   { ssr: false },
 );
 
+function matchesSearch(nameEn: string, nameJa: string, query: string) {
+  const q = query.trim();
+  if (!q) return true;
+  return nameEn.toLowerCase().includes(q.toLowerCase()) || nameJa.includes(q);
+}
+
 export default function MapPage() {
   const { user, loading } = useRequireAuth();
   const [prefectureId, setPrefectureId] = useState<number | null>(null);
@@ -21,6 +27,7 @@ export default function MapPage() {
     null,
   );
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const prefecturesQuery = useQuery({
     queryKey: ["prefectures"],
@@ -145,10 +152,36 @@ export default function MapPage() {
     return null;
   }, [selectedMunicipality, municipalitiesGeoJSONWithNames, prefectureId, prefecturesGeoJSONWithNames]);
 
+  const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
+
+  const filteredPrefectures = useMemo(
+    () => (prefecturesQuery.data ?? []).filter((p) => matchesSearch(p.nameEn, p.nameJa, search)),
+    [prefecturesQuery.data, search],
+  );
+  const filteredMunicipalities = useMemo(
+    () =>
+      (municipalitiesQuery.data ?? []).filter((m) => matchesSearch(m.nameEn, m.nameJa, search)),
+    [municipalitiesQuery.data, search],
+  );
+
   function selectPrefecture(id: number) {
     setPrefectureId(id);
     setSelectedMunicipality(null);
     setIsEditorOpen(false);
+    setSearch("");
+  }
+
+  function backToCountry() {
+    setPrefectureId(null);
+    setSelectedMunicipality(null);
+    setIsEditorOpen(false);
+    setSearch("");
+  }
+
+  function backToPrefecture() {
+    setSelectedMunicipality(null);
+    setIsEditorOpen(false);
+    setSearch("");
   }
 
   function selectMunicipality(m: Municipality) {
@@ -165,66 +198,80 @@ export default function MapPage() {
 
   return (
     <div className="flex h-[calc(100vh-57px)]">
-      <aside className="flex w-80 flex-col gap-4 overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
+      <aside className="flex w-80 flex-col overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
+        {prefectureId === null ? (
+          <div className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold text-neutral-500">จังหวัด</h2>
-            {prefectureId !== null && (
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาจังหวัด..."
+              className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            />
+            {prefecturesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
+            {prefecturesQuery.data?.length === 0 && (
+              <p className="text-sm text-neutral-500">
+                ยังไม่มีข้อมูลจังหวัด (รอ seed ข้อมูลจาก GADM)
+              </p>
+            )}
+            {prefecturesQuery.data && filteredPrefectures.length === 0 && (
+              <p className="text-sm text-neutral-500">ไม่พบจังหวัดที่ค้นหา</p>
+            )}
+            <ul className="flex flex-col gap-1">
+              {filteredPrefectures.map((pref) => (
+                <li key={pref.id}>
+                  <button
+                    onClick={() => selectPrefecture(pref.id)}
+                    className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    {placeName(pref.nameEn, pref.nameJa)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div>
               <button
-                onClick={() => {
-                  setPrefectureId(null);
-                  setSelectedMunicipality(null);
-                  setIsEditorOpen(false);
-                }}
+                onClick={backToCountry}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
-                ดูทั้งประเทศ
+                ← ดูทั้งประเทศ
               </button>
-            )}
-          </div>
-          {prefecturesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
-          {prefecturesQuery.data?.length === 0 && (
-            <p className="text-sm text-neutral-500">
-              ยังไม่มีข้อมูลจังหวัด (รอ seed ข้อมูลจาก GADM)
-            </p>
-          )}
-          <ul className="flex flex-col gap-1">
-            {prefecturesQuery.data?.map((pref) => (
-              <li key={pref.id}>
-                <button
-                  onClick={() => selectPrefecture(pref.id)}
-                  className={`w-full rounded px-3 py-1.5 text-left text-sm ${
-                    prefectureId === pref.id
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                      : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  }`}
-                >
-                  {placeName(pref.nameEn, pref.nameJa)}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {prefectureId !== null && (
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-neutral-500">เมือง/เขต</h2>
-              {selectedMunicipality !== null && (
-                <button
-                  onClick={() => {
-                    setSelectedMunicipality(null);
-                    setIsEditorOpen(false);
-                  }}
-                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  ดูทั้งจังหวัด
-                </button>
-              )}
+              <div className="mt-2 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-neutral-500">
+                  เมือง/เขต
+                  {selectedPrefecture && (
+                    <span className="ml-1 font-normal">
+                      ใน {placeName(selectedPrefecture.nameEn, selectedPrefecture.nameJa)}
+                    </span>
+                  )}
+                </h2>
+                {selectedMunicipality !== null && (
+                  <button
+                    onClick={backToPrefecture}
+                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    ดูทั้งจังหวัด
+                  </button>
+                )}
+              </div>
             </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาเมือง/เขต..."
+              className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            />
             {municipalitiesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
+            {municipalitiesQuery.data && filteredMunicipalities.length === 0 && (
+              <p className="text-sm text-neutral-500">ไม่พบเมือง/เขตที่ค้นหา</p>
+            )}
             <ul className="flex flex-col gap-1">
-              {municipalitiesQuery.data?.map((m) => {
+              {filteredMunicipalities.map((m) => {
                 const visit = visitByMunicipalityId.get(m.id);
                 return (
                   <li key={m.id}>
