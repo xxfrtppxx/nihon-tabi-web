@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { placeName } from "@/lib/format";
@@ -28,6 +28,7 @@ export default function MapPage() {
   );
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [viewportPrefectureIds, setViewportPrefectureIds] = useState<number[]>([]);
 
   const prefecturesQuery = useQuery({
     queryKey: ["prefectures"],
@@ -59,6 +60,26 @@ export default function MapPage() {
     queryFn: () => geoFilesApi.municipalities(prefectureId!),
     enabled: !!user && prefectureId !== null,
     staleTime: Infinity,
+  });
+
+  // Zoomed into the country view without picking a prefecture yet: load
+  // municipality data for whatever prefectures are currently on screen, so
+  // the map can show more detail the way an ordinary map would.
+  const previewEnabled = !!user && prefectureId === null;
+  const previewMunicipalityQueries = useQueries({
+    queries: viewportPrefectureIds.map((id) => ({
+      queryKey: ["municipalities", id],
+      queryFn: () => geoApi.municipalities(id),
+      enabled: previewEnabled,
+    })),
+  });
+  const previewGeoJSONQueries = useQueries({
+    queries: viewportPrefectureIds.map((id) => ({
+      queryKey: ["geo-files", "municipalities", id],
+      queryFn: () => geoFilesApi.municipalities(id),
+      enabled: previewEnabled,
+      staleTime: Infinity,
+    })),
   });
 
   const visitByMunicipalityId = useMemo(() => {
@@ -140,6 +161,27 @@ export default function MapPage() {
     };
   }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data, selectedMunicipality]);
 
+  const previewMunicipalities = useMemo(
+    () => previewMunicipalityQueries.flatMap((q) => q.data ?? []),
+    [previewMunicipalityQueries],
+  );
+
+  const previewMunicipalitiesGeoJSON = useMemo(() => {
+    if (prefectureId !== null) return null;
+    const features = previewGeoJSONQueries.flatMap((q) => q.data?.features ?? []);
+    if (features.length === 0) return null;
+    const nameById = new Map(
+      previewMunicipalities.map((m) => [m.id, placeName(m.nameEn, m.nameJa)]),
+    );
+    return {
+      type: "FeatureCollection" as const,
+      features: features.map((f) => ({
+        ...f,
+        properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
+      })),
+    };
+  }, [previewGeoJSONQueries, previewMunicipalities, prefectureId]);
+
   // Fit to whichever is the more specific current selection: a picked
   // municipality first, else the picked prefecture, else the whole country.
   const fitBounds: LngLatBounds | null = useMemo(() => {
@@ -169,6 +211,7 @@ export default function MapPage() {
     setSelectedMunicipality(null);
     setIsEditorOpen(false);
     setSearch("");
+    setViewportPrefectureIds([]);
   }
 
   function backToCountry() {
@@ -192,6 +235,18 @@ export default function MapPage() {
   function handleMunicipalityPolygonClick(id: number) {
     const municipality = municipalitiesQuery.data?.find((m) => m.id === id);
     if (municipality) selectMunicipality(municipality);
+  }
+
+  // A municipality clicked straight from the country-level detail preview,
+  // before any prefecture was explicitly picked — jump directly into that
+  // prefecture's drill-down with this municipality already selected.
+  function handlePreviewMunicipalityClick(id: number) {
+    const municipality = previewMunicipalities.find((m) => m.id === id);
+    if (!municipality) return;
+    setPrefectureId(municipality.prefectureId);
+    setSearch("");
+    setViewportPrefectureIds([]);
+    selectMunicipality(municipality);
   }
 
   if (loading || !user) return null;
@@ -309,12 +364,15 @@ export default function MapPage() {
           fitBounds={fitBounds}
           prefecturesGeoJSON={prefecturesGeoJSONWithNames}
           municipalitiesGeoJSON={municipalitiesGeoJSONWithNames}
+          previewMunicipalitiesGeoJSON={previewMunicipalitiesGeoJSON}
           visitedPrefectureIds={visitedPrefectureIds}
           visitedMunicipalityIds={visitedMunicipalityIds}
           wantMunicipalityIds={wantMunicipalityIds}
           selectedPrefectureId={prefectureId}
           onPrefectureClick={selectPrefecture}
           onMunicipalityClick={handleMunicipalityPolygonClick}
+          onPreviewMunicipalityClick={handlePreviewMunicipalityClick}
+          onViewportPrefecturesChange={setViewportPrefectureIds}
         />
       </main>
 

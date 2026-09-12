@@ -42,10 +42,13 @@ const BLANK_STYLE: StyleSpecification = {
 
 const LABEL_FONT = ["Noto Sans Regular"];
 
-// Zoom level past which "no prefecture selected yet" should still resolve
-// to whatever prefecture is under the middle of the screen, instead of
-// leaving the municipality layer empty until the user picks one explicitly.
-const AUTO_SELECT_ZOOM = 6;
+// Zoom level past which the country view starts revealing municipality
+// detail for whatever prefectures are on screen, like a normal slippy map
+// showing more detail as you zoom in — no selection required.
+const DETAIL_ZOOM = 6;
+// Cap how many prefectures' municipality data we'll load at once for that
+// preview, in case a wide, zoomed-in-enough view spans many small ones.
+const MAX_PREVIEW_PREFECTURES = 8;
 
 const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
@@ -55,22 +58,28 @@ export function MapView({
   fitBounds,
   prefecturesGeoJSON,
   municipalitiesGeoJSON,
+  previewMunicipalitiesGeoJSON,
   visitedPrefectureIds,
   visitedMunicipalityIds,
   wantMunicipalityIds,
   selectedPrefectureId,
   onPrefectureClick,
   onMunicipalityClick,
+  onPreviewMunicipalityClick,
+  onViewportPrefecturesChange,
 }: {
   fitBounds: [[number, number], [number, number]] | null;
   prefecturesGeoJSON: GeoJSON.FeatureCollection | null;
   municipalitiesGeoJSON: GeoJSON.FeatureCollection | null;
+  previewMunicipalitiesGeoJSON: GeoJSON.FeatureCollection | null;
   visitedPrefectureIds: number[];
   visitedMunicipalityIds: number[];
   wantMunicipalityIds: number[];
   selectedPrefectureId: number | null;
   onPrefectureClick: (id: number) => void;
   onMunicipalityClick: (id: number) => void;
+  onPreviewMunicipalityClick: (id: number) => void;
+  onViewportPrefecturesChange: (ids: number[]) => void;
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFitRef = useRef(false);
@@ -93,6 +102,8 @@ export function MapView({
     const id = feature?.properties?.id;
     if (typeof id !== "number") return;
     if (feature!.layer.id === "municipalities-fill") onMunicipalityClick(id);
+    else if (feature!.layer.id === "preview-municipalities-fill")
+      onPreviewMunicipalityClick(id);
     else if (feature!.layer.id === "prefectures-fill") onPrefectureClick(id);
   }
 
@@ -104,21 +115,28 @@ export function MapView({
     if (map) map.setMinZoom(map.getZoom());
   }
 
-  // Scrolling/pinching in on the blank country view (without clicking a
-  // prefecture first) should still resolve to whatever prefecture ends up
-  // under the middle of the screen, instead of showing nothing until the
-  // user picks one from the list.
+  // Zooming in on the country view without picking a prefecture first
+  // should still reveal more detail, the way an ordinary map does — report
+  // whichever prefectures are currently on screen so the page can load
+  // their municipality boundaries, without collapsing to a single selection.
   function handleMoveEnd() {
-    if (selectedPrefectureId !== null) return;
     const map = mapRef.current?.getMap();
     if (!map) return;
-    if (map.getZoom() < AUTO_SELECT_ZOOM) return;
-    const center = map.project(map.getCenter());
-    const [feature] = map.queryRenderedFeatures([center.x, center.y], {
+    if (selectedPrefectureId !== null || map.getZoom() < DETAIL_ZOOM) {
+      onViewportPrefecturesChange([]);
+      return;
+    }
+    const features = map.queryRenderedFeatures(undefined, {
       layers: ["prefectures-fill"],
     });
-    const id = feature?.properties?.id;
-    if (typeof id === "number") onPrefectureClick(id);
+    const ids = Array.from(
+      new Set(
+        features
+          .map((f) => f.properties?.id)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    ).slice(0, MAX_PREVIEW_PREFECTURES);
+    onViewportPrefecturesChange(ids);
   }
 
   return (
@@ -128,7 +146,11 @@ export function MapView({
       maxBounds={JAPAN_MAX_BOUNDS}
       mapStyle={BLANK_STYLE}
       style={{ width: "100%", height: "100%" }}
-      interactiveLayerIds={["prefectures-fill", "municipalities-fill"]}
+      interactiveLayerIds={[
+        "prefectures-fill",
+        "municipalities-fill",
+        "preview-municipalities-fill",
+      ]}
       onClick={handleClick}
       onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
@@ -169,6 +191,52 @@ export function MapView({
               "text-field": ["get", "name"],
               "text-font": LABEL_FONT,
               "text-size": 13,
+            }}
+            paint={{
+              "text-color": "#1e293b",
+              "text-halo-color": "#f8fafc",
+              "text-halo-width": 1.5,
+            }}
+          />
+        </Source>
+      )}
+
+      {previewMunicipalitiesGeoJSON && (
+        <Source
+          id="preview-municipalities"
+          type="geojson"
+          data={previewMunicipalitiesGeoJSON}
+        >
+          <Layer
+            id="preview-municipalities-fill"
+            type="fill"
+            minzoom={DETAIL_ZOOM}
+            paint={{
+              "fill-color": [
+                "case",
+                ["in", ["get", "id"], ["literal", visitedMunicipalityIds]],
+                VISITED_COLOR,
+                ["in", ["get", "id"], ["literal", wantMunicipalityIds]],
+                WANT_COLOR,
+                NEUTRAL_COLOR,
+              ],
+              "fill-opacity": 0.45,
+            }}
+          />
+          <Layer
+            id="preview-municipalities-line"
+            type="line"
+            minzoom={DETAIL_ZOOM}
+            paint={{ "line-color": "#1e293b", "line-width": 1 }}
+          />
+          <Layer
+            id="preview-municipalities-label"
+            type="symbol"
+            minzoom={DETAIL_ZOOM}
+            layout={{
+              "text-field": ["get", "name"],
+              "text-font": LABEL_FONT,
+              "text-size": 11,
             }}
             paint={{
               "text-color": "#1e293b",
