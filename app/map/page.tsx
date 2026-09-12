@@ -93,14 +93,18 @@ export default function MapPage() {
     const nameById = new Map(
       prefecturesQuery.data.map((p) => [p.id, placeName(p.nameEn, p.nameJa)]),
     );
+    const features =
+      prefectureId === null
+        ? geojson.features
+        : geojson.features.filter((f) => f.properties?.id === prefectureId);
     return {
       ...geojson,
-      features: geojson.features.map((f) => ({
+      features: features.map((f) => ({
         ...f,
         properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
       })),
     };
-  }, [prefecturesGeoJSONQuery.data, prefecturesQuery.data]);
+  }, [prefecturesGeoJSONQuery.data, prefecturesQuery.data, prefectureId]);
 
   const municipalitiesGeoJSONWithNames = useMemo(() => {
     const geojson = municipalitiesGeoJSONQuery.data;
@@ -108,14 +112,17 @@ export default function MapPage() {
     const nameById = new Map(
       municipalitiesQuery.data.map((m) => [m.id, placeName(m.nameEn, m.nameJa)]),
     );
+    const features = activeMunicipality
+      ? geojson.features.filter((f) => f.properties?.id === activeMunicipality.id)
+      : geojson.features;
     return {
       ...geojson,
-      features: geojson.features.map((f) => ({
+      features: features.map((f) => ({
         ...f,
         properties: { ...f.properties, name: nameById.get(f.properties?.id) ?? "" },
       })),
     };
-  }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data]);
+  }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data, activeMunicipality]);
 
   const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
   const flyTo: FlyToTarget | null =
