@@ -129,6 +129,7 @@ export function MapView({
           <Layer
             id="prefectures-label"
             type="symbol"
+            maxzoom={7}
             layout={{
               "text-field": ["get", "name"],
               "text-font": LABEL_FONT,
