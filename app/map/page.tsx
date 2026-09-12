@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { placeName } from "@/lib/format";
 import { VisitEditor } from "@/components/visit-editor";
 import type { FlyToTarget } from "@/components/map-view";
 
@@ -89,7 +90,9 @@ export default function MapPage() {
   const prefecturesGeoJSONWithNames = useMemo(() => {
     const geojson = prefecturesGeoJSONQuery.data;
     if (!geojson || !prefecturesQuery.data) return null;
-    const nameById = new Map(prefecturesQuery.data.map((p) => [p.id, p.nameJa]));
+    const nameById = new Map(
+      prefecturesQuery.data.map((p) => [p.id, placeName(p.nameEn, p.nameJa)]),
+    );
     return {
       ...geojson,
       features: geojson.features.map((f) => ({
@@ -102,7 +105,9 @@ export default function MapPage() {
   const municipalitiesGeoJSONWithNames = useMemo(() => {
     const geojson = municipalitiesGeoJSONQuery.data;
     if (!geojson || !municipalitiesQuery.data) return null;
-    const nameById = new Map(municipalitiesQuery.data.map((m) => [m.id, m.nameJa]));
+    const nameById = new Map(
+      municipalitiesQuery.data.map((m) => [m.id, placeName(m.nameEn, m.nameJa)]),
+    );
     return {
       ...geojson,
       features: geojson.features.map((f) => ({
@@ -147,8 +152,7 @@ export default function MapPage() {
                       : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   }`}
                 >
-                  {pref.nameJa}
-                  <span className="ml-1 text-xs opacity-60">{pref.nameEn}</span>
+                  {placeName(pref.nameEn, pref.nameJa)}
                 </button>
               </li>
             ))}
@@ -168,7 +172,7 @@ export default function MapPage() {
                       onClick={() => setActiveMunicipality(m)}
                       className="flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
                     >
-                      <span>{m.nameJa}</span>
+                      <span>{placeName(m.nameEn, m.nameJa)}</span>
                       {visit && (
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs ${

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { visitsApi } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { placeName } from "@/lib/format";
 
 export default function VisitsPage() {
   const { user, loading } = useRequireAuth();
@@ -34,9 +35,12 @@ export default function VisitsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold">
-                  {visit.municipality.nameJa}{" "}
+                  {placeName(visit.municipality.nameEn, visit.municipality.nameJa)}{" "}
                   <span className="text-sm font-normal text-neutral-500">
-                    {visit.municipality.prefecture.nameJa}
+                    {placeName(
+                      visit.municipality.prefecture.nameEn,
+                      visit.municipality.prefecture.nameJa,
+                    )}
                   </span>
                 </p>
                 {visit.visitedOn && (

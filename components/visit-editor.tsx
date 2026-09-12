@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { visitsApi, type Municipality, type Visit, type VisitStatus } from "@/lib/api";
+import { placeName } from "@/lib/format";
 
 export function VisitEditor({
   municipality,
@@ -55,8 +56,9 @@ export function VisitEditor({
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="w-full max-w-md rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl">
         <div className="mb-4">
-          <h2 className="text-lg font-bold">{municipality.nameJa}</h2>
-          <p className="text-sm text-neutral-500">{municipality.nameEn}</p>
+          <h2 className="text-lg font-bold">
+            {placeName(municipality.nameEn, municipality.nameJa)}
+          </h2>
         </div>
 
         <div className="flex flex-col gap-4">
