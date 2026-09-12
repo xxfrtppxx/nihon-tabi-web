@@ -1,6 +1,5 @@
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
 }
 
 const STORAGE_KEY = "nihon-tabi-tokens";
@@ -28,10 +27,6 @@ export function getTokens(): AuthTokens | null {
 
 export function getAccessToken(): string | null {
   return getTokens()?.accessToken ?? null;
-}
-
-export function getRefreshToken(): string | null {
-  return getTokens()?.refreshToken ?? null;
 }
 
 export function setTokens(next: AuthTokens | null) {

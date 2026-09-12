@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Map, {
   Layer,
+  Marker,
   NavigationControl,
   Source,
   type MapLayerMouseEvent,
@@ -10,6 +12,7 @@ import Map, {
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { boundsOfGeometry, centerOfBounds, geometryToSvgPath } from "@/lib/geo";
 
 // Japan's full extent (mainland + Okinawa), from the GADM dataset's own bounds.
 const JAPAN_BOUNDS: [[number, number], [number, number]] = [
@@ -27,6 +30,8 @@ const JAPAN_MAX_BOUNDS: [number, number, number, number] = [
 
 // No basemap — just a flat background. We only want our own boundary
 // polygons on screen, not OpenFreeMap's streets/labels underneath them.
+const MAP_BACKGROUND_COLOR = "#f8fafc";
+
 const BLANK_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
@@ -35,7 +40,7 @@ const BLANK_STYLE: StyleSpecification = {
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#f8fafc" },
+      paint: { "background-color": MAP_BACKGROUND_COLOR },
     },
   ],
 };
@@ -54,6 +59,40 @@ const MAX_PREVIEW_PREFECTURES = 47;
 const VISITED_COLOR = "#22c55e";
 const WANT_COLOR = "#f59e0b";
 const NEUTRAL_COLOR = "#94a3b8";
+// Literal midpoint of VISITED_COLOR and WANT_COLOR — a place with both a
+// visit and a want-to-go plan gets this blended color rather than picking
+// one status to represent it.
+const MIXED_COLOR = "#8cb235";
+
+// The flat municipality fill uses these same hex constants but at 45%
+// opacity over the map's background — so a solid-fill model card in the
+// raw hex would look far more saturated than the map ever does. Blending
+// each color against that same background up front keeps the model's
+// color matched to what the map actually shows, not just the constant.
+const MUNICIPALITY_FILL_OPACITY = 0.45;
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function blendOverBackground(colorHex: string, alpha: number, backgroundHex: string): string {
+  const [r, g, b] = hexToRgb(colorHex);
+  const [br, bg, bb] = hexToRgb(backgroundHex);
+  const mix = (fg: number, back: number) => Math.round(fg * alpha + back * (1 - alpha));
+  return `#${[mix(r, br), mix(g, bg), mix(b, bb)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+const MODEL_COLOR = {
+  visited: blendOverBackground(VISITED_COLOR, MUNICIPALITY_FILL_OPACITY, MAP_BACKGROUND_COLOR),
+  want_to_go: blendOverBackground(WANT_COLOR, MUNICIPALITY_FILL_OPACITY, MAP_BACKGROUND_COLOR),
+  mixed: blendOverBackground(MIXED_COLOR, MUNICIPALITY_FILL_OPACITY, MAP_BACKGROUND_COLOR),
+  none: blendOverBackground(NEUTRAL_COLOR, MUNICIPALITY_FILL_OPACITY, MAP_BACKGROUND_COLOR),
+};
+
+// Caps how many photo pins render on the model card at once — this only
+// limits the map preview, not how many photos a visit can actually have
+// (uploading is unlimited; the timeline list shows every one of them).
+const MAX_PHOTO_PINS = 10;
 
 export function MapView({
   fitBounds,
@@ -63,11 +102,18 @@ export function MapView({
   visitedPrefectureIds,
   visitedMunicipalityIds,
   wantMunicipalityIds,
+  mixedPrefectureIds,
+  mixedMunicipalityIds,
   selectedPrefectureId,
+  selectedMunicipalityGeometry,
+  selectedMunicipalityPhotoUrls,
+  selectedMunicipalityStatus,
   onPrefectureClick,
   onMunicipalityClick,
   onPreviewMunicipalityClick,
   onViewportPrefecturesChange,
+  onEmptyAreaClick,
+  onPhotoAreaClick,
 }: {
   fitBounds: [[number, number], [number, number]] | null;
   prefecturesGeoJSON: GeoJSON.FeatureCollection | null;
@@ -76,11 +122,18 @@ export function MapView({
   visitedPrefectureIds: number[];
   visitedMunicipalityIds: number[];
   wantMunicipalityIds: number[];
+  mixedPrefectureIds: number[];
+  mixedMunicipalityIds: number[];
   selectedPrefectureId: number | null;
+  selectedMunicipalityGeometry: GeoJSON.Geometry | null;
+  selectedMunicipalityPhotoUrls: string[];
+  selectedMunicipalityStatus: "visited" | "want_to_go" | "mixed" | "none";
   onPrefectureClick: (id: number) => void;
   onMunicipalityClick: (id: number) => void;
   onPreviewMunicipalityClick: (id: number) => void;
   onViewportPrefecturesChange: (ids: number[]) => void;
+  onEmptyAreaClick: () => void;
+  onPhotoAreaClick: () => void;
 }) {
   const mapRef = useRef<MapRef>(null);
   const hasFitRef = useRef(false);
@@ -106,6 +159,45 @@ export function MapView({
       map.fitBounds(JAPAN_BOUNDS, { padding: 24, duration: 1000 });
     }
   }, [fitBounds]);
+
+  // Selecting a city no longer opens an edit form directly — instead it
+  // shows a tilted 3D card of the polygon shape in place of the flat map,
+  // colored the same as visited/want_to_go/mixed would have been, with any
+  // visit photos pinned on top of it Google-Maps-style. Clickable to jump
+  // into the right part of the editor.
+  const selectionBounds = useMemo(
+    () => (selectedMunicipalityGeometry ? boundsOfGeometry(selectedMunicipalityGeometry) : null),
+    [selectedMunicipalityGeometry],
+  );
+  const tiltedCard = useMemo(() => {
+    if (!selectedMunicipalityGeometry || !selectionBounds) return null;
+    const color = MODEL_COLOR[selectedMunicipalityStatus];
+    return {
+      center: centerOfBounds(selectionBounds),
+      path: geometryToSvgPath(selectedMunicipalityGeometry, selectionBounds),
+      color,
+    };
+  }, [selectedMunicipalityGeometry, selectionBounds, selectedMunicipalityStatus]);
+
+  // Sized to match how big the polygon itself would have appeared on the
+  // flat map at the current zoom — reset to "unknown" on every new
+  // selection (the React-documented "adjust state during render" pattern,
+  // rather than an effect) so the card doesn't flash at the previous
+  // city's size before the fit-bounds animation's moveend recomputes it.
+  const [modelSizePx, setModelSizePx] = useState<number | null>(null);
+  const [sizedForGeometry, setSizedForGeometry] = useState(selectedMunicipalityGeometry);
+  if (selectedMunicipalityGeometry !== sizedForGeometry) {
+    setSizedForGeometry(selectedMunicipalityGeometry);
+    setModelSizePx(null);
+  }
+  function updateModelSize() {
+    const map = mapRef.current?.getMap();
+    if (!map || !selectionBounds) return;
+    const nw = map.project([selectionBounds[0][0], selectionBounds[1][1]]);
+    const se = map.project([selectionBounds[1][0], selectionBounds[0][1]]);
+    const size = Math.max(Math.abs(se.x - nw.x), Math.abs(se.y - nw.y));
+    if (Number.isFinite(size) && size > 0) setModelSizePx(size);
+  }
 
   function handleClick(e: MapLayerMouseEvent) {
     const feature = e.features?.[0];
@@ -149,6 +241,7 @@ export function MapView({
   function handleMoveEnd() {
     const map = mapRef.current?.getMap();
     if (!map) return;
+    updateModelSize();
     if (selectedPrefectureId !== null || map.getZoom() < DETAIL_ZOOM) {
       onViewportPrefecturesChange([]);
       return;
@@ -192,6 +285,8 @@ export function MapView({
             paint={{
               "fill-color": [
                 "case",
+                ["in", ["get", "id"], ["literal", mixedPrefectureIds]],
+                MIXED_COLOR,
                 ["in", ["get", "id"], ["literal", visitedPrefectureIds]],
                 VISITED_COLOR,
                 "transparent",
@@ -241,6 +336,8 @@ export function MapView({
             paint={{
               "fill-color": [
                 "case",
+                ["in", ["get", "id"], ["literal", mixedMunicipalityIds]],
+                MIXED_COLOR,
                 ["in", ["get", "id"], ["literal", visitedMunicipalityIds]],
                 VISITED_COLOR,
                 ["in", ["get", "id"], ["literal", wantMunicipalityIds]],
@@ -282,6 +379,8 @@ export function MapView({
             paint={{
               "fill-color": [
                 "case",
+                ["in", ["get", "id"], ["literal", mixedMunicipalityIds]],
+                MIXED_COLOR,
                 ["in", ["get", "id"], ["literal", visitedMunicipalityIds]],
                 VISITED_COLOR,
                 ["in", ["get", "id"], ["literal", wantMunicipalityIds]],
@@ -311,6 +410,106 @@ export function MapView({
             }}
           />
         </Source>
+      )}
+
+      {tiltedCard && modelSizePx && (
+        <Marker
+          longitude={tiltedCard.center[0]}
+          latitude={tiltedCard.center[1]}
+          onClick={selectedMunicipalityPhotoUrls.length > 0 ? onPhotoAreaClick : onEmptyAreaClick}
+        >
+          <div
+            className="relative cursor-pointer"
+            style={{ width: modelSizePx, height: modelSizePx, perspective: modelSizePx * 4 }}
+          >
+            {/* A single flat, tilted shape reads as a squished 2D blob rather
+                than a 3D object — a second darker copy underneath, pushed
+                back in Z, gives the top face something to visibly float
+                above so the tilt actually looks like a raised card. */}
+            <svg
+              viewBox="0 0 200 200"
+              width={modelSizePx}
+              height={modelSizePx}
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: "rotateX(50deg) rotateZ(-8deg) translateZ(0px)",
+              }}
+            >
+              <path d={tiltedCard.path} fill="#0f172a" fillRule="evenodd" />
+            </svg>
+            <svg
+              viewBox="0 0 200 200"
+              width={modelSizePx}
+              height={modelSizePx}
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: `rotateX(50deg) rotateZ(-8deg) translateZ(${modelSizePx * 0.22}px)`,
+                filter: "drop-shadow(0 8px 8px rgba(0,0,0,0.4))",
+              }}
+            >
+              <path d={tiltedCard.path} fill={tiltedCard.color} stroke="#1e293b" strokeWidth={2} fillRule="evenodd" />
+            </svg>
+
+            {/* Visit photos pinned on top of the model, Google-Maps-style —
+                a rounded square card with a small pointed tail underneath,
+                scattered at a stable (seeded, not re-rolled per render)
+                random spot over the model so a handful of photos don't
+                all land in an identical tidy row.
+
+                The visible top face isn't just sitting flat in this div —
+                it's displaced by the same rotateX/rotateZ/translateZ used
+                to tilt it, so plain percentage-based positioning here would
+                float outside the shape it's meant to sit on. Each pin's
+                anchor gets that identical 3D transform (with the scatter
+                offset applied in the same pre-rotation local plane as the
+                polygon's own path coordinates) so it tracks the tilted
+                surface exactly; a counter-rotation on the pin's own content
+                then cancels that tilt back out so the photo itself renders
+                upright rather than skewed. */}
+            {selectedMunicipalityPhotoUrls.slice(0, MAX_PHOTO_PINS).map((url, i) => {
+              const seed = i + 1;
+              const rand = (n: number) => {
+                const x = Math.sin(seed * n) * 10000;
+                return x - Math.floor(x);
+              };
+              const offsetX = (rand(12.9898) - 0.5) * modelSizePx * 0.42;
+              const offsetY = (rand(78.233) - 0.5) * modelSizePx * 0.24;
+              const rotation = (rand(37.719) - 0.5) * 20;
+              const topFaceZ = modelSizePx * 0.22;
+              return (
+                <div
+                  key={i}
+                  className="absolute left-1/2 top-1/2 z-10"
+                  style={{
+                    transform: `rotateX(50deg) rotateZ(-8deg) translate3d(${offsetX}px, ${offsetY}px, ${topFaceZ}px)`,
+                    // Without this, the counter-rotation below gets
+                    // flattened into this div's own plane instead of
+                    // composing in true 3D, and the "undo" no longer
+                    // cancels cleanly — the photo renders squashed.
+                    transformStyle: "preserve-3d",
+                  }}
+                >
+                  <div
+                    className="drop-shadow-lg"
+                    style={{ transform: `rotateZ(8deg) rotateX(-50deg) translate(-50%, -100%) rotate(${rotation}deg)` }}
+                  >
+                    <div className="flex flex-col items-center">
+                      <div className="relative h-11 w-11 overflow-hidden rounded-lg border-2 border-white bg-neutral-200">
+                        <Image src={url} alt="" fill sizes="44px" className="object-cover" />
+                      </div>
+                      <div
+                        className="h-0 w-0 border-x-[6px] border-t-[8px] border-x-transparent border-t-white"
+                        style={{ marginTop: -1 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Marker>
       )}
     </Map>
   );

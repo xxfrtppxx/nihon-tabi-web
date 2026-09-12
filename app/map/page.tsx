@@ -6,7 +6,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { placeName } from "@/lib/format";
-import { boundsOfFeatureCollection, type LngLatBounds } from "@/lib/geo";
+import { boundsOfFeatureCollection, boundsOfGeometry, type LngLatBounds } from "@/lib/geo";
 import { VisitEditor } from "@/components/visit-editor";
 
 const MapView = dynamic(
@@ -26,7 +26,10 @@ export default function MapPage() {
   const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(
     null,
   );
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editorRequest, setEditorRequest] = useState<{
+    municipality: Municipality | null;
+    mode: "list" | "new";
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [viewportPrefectureIds, setViewportPrefectureIds] = useState<number[]>([]);
 
@@ -82,10 +85,12 @@ export default function MapPage() {
     })),
   });
 
-  const visitByMunicipalityId = useMemo(() => {
-    const map = new Map<number, Visit>();
+  const visitsByMunicipalityId = useMemo(() => {
+    const map = new Map<number, Visit[]>();
     for (const visit of visitsQuery.data ?? []) {
-      map.set(visit.municipalityId, visit);
+      const list = map.get(visit.municipalityId);
+      if (list) list.push(visit);
+      else map.set(visit.municipalityId, [visit]);
     }
     return map;
   }, [visitsQuery.data]);
@@ -104,6 +109,10 @@ export default function MapPage() {
         .map((v) => v.municipalityId),
     [visitsQuery.data],
   );
+  const mixedMunicipalityIds = useMemo(() => {
+    const wantSet = new Set(wantMunicipalityIds);
+    return Array.from(new Set(visitedMunicipalityIds.filter((id) => wantSet.has(id))));
+  }, [visitedMunicipalityIds, wantMunicipalityIds]);
   const visitedPrefectureIds = useMemo(
     () =>
       Array.from(
@@ -115,6 +124,21 @@ export default function MapPage() {
       ),
     [visitsQuery.data],
   );
+  const wantPrefectureIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (visitsQuery.data ?? [])
+            .filter((v) => v.status === "want_to_go")
+            .map((v) => v.municipality.prefectureId),
+        ),
+      ),
+    [visitsQuery.data],
+  );
+  const mixedPrefectureIds = useMemo(() => {
+    const wantSet = new Set(wantPrefectureIds);
+    return Array.from(new Set(visitedPrefectureIds.filter((id) => wantSet.has(id))));
+  }, [visitedPrefectureIds, wantPrefectureIds]);
 
   const prefecturesGeoJSONWithNames = useMemo(() => {
     const geojson = prefecturesGeoJSONQuery.data;
@@ -149,9 +173,10 @@ export default function MapPage() {
     const nameById = new Map(
       municipalitiesQuery.data.map((m) => [m.id, placeName(m.nameEn, m.nameJa)]),
     );
-    const features = selectedMunicipality
-      ? geojson.features.filter((f) => f.properties?.id === selectedMunicipality.id)
-      : geojson.features;
+    // Once a city is selected, its 3D card / photo pins take over as the
+    // visual entirely — the flat polygon underneath is hidden rather than
+    // shown alongside it.
+    const features = selectedMunicipality ? [] : geojson.features;
     return {
       ...geojson,
       features: features.map((f) => ({
@@ -160,6 +185,35 @@ export default function MapPage() {
       })),
     };
   }, [municipalitiesGeoJSONQuery.data, municipalitiesQuery.data, selectedMunicipality]);
+
+  // Feeds the map's in-place preview (photo pins or a tilted polygon card)
+  // for whichever city is currently selected — not shown at all otherwise.
+  // Looked up independently of municipalitiesGeoJSONWithNames since that
+  // collection no longer carries the selected city's own feature.
+  const selectedMunicipalityGeometry = useMemo(() => {
+    if (!selectedMunicipality) return null;
+    const feature = municipalitiesGeoJSONQuery.data?.features.find(
+      (f) => f.properties?.id === selectedMunicipality.id,
+    );
+    return feature?.geometry ?? null;
+  }, [selectedMunicipality, municipalitiesGeoJSONQuery.data]);
+  // One representative photo per post/visit, not every photo it has — the
+  // timeline (list view) is where all of a post's photos actually show.
+  const selectedMunicipalityPhotoUrls = useMemo(() => {
+    if (!selectedMunicipality) return [];
+    const visits = visitsByMunicipalityId.get(selectedMunicipality.id) ?? [];
+    return visits.filter((v) => v.photos.length > 0).map((v) => v.photos[0].url);
+  }, [selectedMunicipality, visitsByMunicipalityId]);
+  // Same status classification the flat polygon fill uses, so the 3D card
+  // keeps the same color meaning instead of always rendering neutral gray.
+  const selectedMunicipalityStatus = useMemo(() => {
+    if (!selectedMunicipality) return "none" as const;
+    const id = selectedMunicipality.id;
+    if (mixedMunicipalityIds.includes(id)) return "mixed" as const;
+    if (visitedMunicipalityIds.includes(id)) return "visited" as const;
+    if (wantMunicipalityIds.includes(id)) return "want_to_go" as const;
+    return "none" as const;
+  }, [selectedMunicipality, mixedMunicipalityIds, visitedMunicipalityIds, wantMunicipalityIds]);
 
   const previewMunicipalities = useMemo(
     () => previewMunicipalityQueries.flatMap((q) => q.data ?? []),
@@ -185,14 +239,14 @@ export default function MapPage() {
   // Fit to whichever is the more specific current selection: a picked
   // municipality first, else the picked prefecture, else the whole country.
   const fitBounds: LngLatBounds | null = useMemo(() => {
-    if (selectedMunicipality && municipalitiesGeoJSONWithNames) {
-      return boundsOfFeatureCollection(municipalitiesGeoJSONWithNames);
+    if (selectedMunicipality && selectedMunicipalityGeometry) {
+      return boundsOfGeometry(selectedMunicipalityGeometry);
     }
     if (prefectureId !== null && prefecturesGeoJSONWithNames) {
       return boundsOfFeatureCollection(prefecturesGeoJSONWithNames);
     }
     return null;
-  }, [selectedMunicipality, municipalitiesGeoJSONWithNames, prefectureId, prefecturesGeoJSONWithNames]);
+  }, [selectedMunicipality, selectedMunicipalityGeometry, prefectureId, prefecturesGeoJSONWithNames]);
 
   const selectedPrefecture = prefecturesQuery.data?.find((p) => p.id === prefectureId);
 
@@ -209,7 +263,7 @@ export default function MapPage() {
   function selectPrefecture(id: number) {
     setPrefectureId(id);
     setSelectedMunicipality(null);
-    setIsEditorOpen(false);
+    setEditorRequest(null);
     setSearch("");
     setViewportPrefectureIds([]);
   }
@@ -217,19 +271,29 @@ export default function MapPage() {
   function backToCountry() {
     setPrefectureId(null);
     setSelectedMunicipality(null);
-    setIsEditorOpen(false);
+    setEditorRequest(null);
     setSearch("");
   }
 
   function backToPrefecture() {
     setSelectedMunicipality(null);
-    setIsEditorOpen(false);
+    setEditorRequest(null);
     setSearch("");
   }
 
   function selectMunicipality(m: Municipality) {
     setSelectedMunicipality(m);
-    setIsEditorOpen(true);
+  }
+
+  // Used both by the floating "+ Add data" button and by tapping a city's
+  // tilted preview card — either way it's a fresh record, pre-filled to
+  // whichever city (if any) is currently selected.
+  function openNewEntry() {
+    setEditorRequest({ municipality: selectedMunicipality, mode: "new" });
+  }
+
+  function openExistingRecords() {
+    setEditorRequest({ municipality: selectedMunicipality, mode: "list" });
   }
 
   function handleMunicipalityPolygonClick(id: number) {
@@ -327,29 +391,32 @@ export default function MapPage() {
             )}
             <ul className="flex flex-col gap-1">
               {filteredMunicipalities.map((m) => {
-                const visit = visitByMunicipalityId.get(m.id);
+                const visits = visitsByMunicipalityId.get(m.id) ?? [];
+                const hasVisited = visits.some((v) => v.status === "visited");
+                const hasWant = visits.some((v) => v.status === "want_to_go");
                 return (
                   <li key={m.id}>
                     <button
                       onClick={() => selectMunicipality(m)}
-                      className={`flex w-full items-center justify-between rounded px-3 py-1.5 text-left text-sm ${
+                      className={`flex w-full items-center justify-between gap-2 rounded px-3 py-1.5 text-left text-sm ${
                         selectedMunicipality?.id === m.id
                           ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
                           : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
                       }`}
                     >
                       <span>{placeName(m.nameEn, m.nameJa)}</span>
-                      {visit && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs ${
-                            visit.status === "visited"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                          }`}
-                        >
-                          {visit.status === "visited" ? "Visited" : "Want to go"}
-                        </span>
-                      )}
+                      <span className="flex shrink-0 gap-1">
+                        {hasVisited && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                            Visited
+                          </span>
+                        )}
+                        {hasWant && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                            Want to go
+                          </span>
+                        )}
+                      </span>
                     </button>
                   </li>
                 );
@@ -368,19 +435,41 @@ export default function MapPage() {
           visitedPrefectureIds={visitedPrefectureIds}
           visitedMunicipalityIds={visitedMunicipalityIds}
           wantMunicipalityIds={wantMunicipalityIds}
+          mixedPrefectureIds={mixedPrefectureIds}
+          mixedMunicipalityIds={mixedMunicipalityIds}
           selectedPrefectureId={prefectureId}
+          selectedMunicipalityGeometry={selectedMunicipalityGeometry}
+          selectedMunicipalityPhotoUrls={selectedMunicipalityPhotoUrls}
+          selectedMunicipalityStatus={selectedMunicipalityStatus}
           onPrefectureClick={selectPrefecture}
           onMunicipalityClick={handleMunicipalityPolygonClick}
           onPreviewMunicipalityClick={handlePreviewMunicipalityClick}
           onViewportPrefecturesChange={setViewportPrefectureIds}
+          onEmptyAreaClick={openNewEntry}
+          onPhotoAreaClick={openExistingRecords}
         />
+
+        <button
+          type="button"
+          onClick={openNewEntry}
+          className="absolute bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-2xl text-white shadow-lg hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          aria-label="Add data"
+          title="Add data"
+        >
+          +
+        </button>
       </main>
 
-      {isEditorOpen && selectedMunicipality && (
+      {editorRequest && (
         <VisitEditor
-          municipality={selectedMunicipality}
-          existingVisit={visitByMunicipalityId.get(selectedMunicipality.id)}
-          onClose={() => setIsEditorOpen(false)}
+          initialMunicipality={editorRequest.municipality}
+          visits={
+            editorRequest.municipality
+              ? (visitsByMunicipalityId.get(editorRequest.municipality.id) ?? [])
+              : []
+          }
+          mode={editorRequest.mode}
+          onClose={() => setEditorRequest(null)}
         />
       )}
     </div>

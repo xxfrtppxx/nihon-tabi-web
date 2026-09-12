@@ -34,3 +34,49 @@ export function boundsOfFeatureCollection(
     [bbox[2], bbox[3]],
   ];
 }
+
+export function boundsOfGeometry(geometry: GeoJSON.Geometry): LngLatBounds | null {
+  const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+  extendBboxWithGeometry(bbox, geometry);
+  if (!Number.isFinite(bbox[0])) return null;
+  return [
+    [bbox[0], bbox[1]],
+    [bbox[2], bbox[3]],
+  ];
+}
+
+export function centerOfBounds(bounds: LngLatBounds): [number, number] {
+  return [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
+}
+
+// Projects a polygon's lng/lat rings into a square SVG viewBox (0..viewSize
+// on each axis), preserving aspect ratio and flipping the Y axis (SVG grows
+// downward, latitude grows upward) — just enough to draw the shape as a
+// standalone graphic, not a real map projection.
+export function geometryToSvgPath(
+  geometry: GeoJSON.Geometry,
+  bounds: LngLatBounds,
+  viewSize = 200,
+): string {
+  const [[minLng, minLat], [maxLng, maxLat]] = bounds;
+  const w = maxLng - minLng || 1;
+  const h = maxLat - minLat || 1;
+  const scale = (viewSize * 0.9) / Math.max(w, h);
+  const offsetX = (viewSize - w * scale) / 2;
+  const offsetY = (viewSize - h * scale) / 2;
+  function project([lng, lat]: number[]): [number, number] {
+    const x = (lng - minLng) * scale + offsetX;
+    const y = viewSize - ((lat - minLat) * scale + offsetY);
+    return [x, y];
+  }
+  function ringToPath(ring: number[][]): string {
+    return ring.map((pt, i) => `${i === 0 ? "M" : "L"}${project(pt).join(",")}`).join(" ") + " Z";
+  }
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates.map(ringToPath).join(" ");
+  }
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.flatMap((polygon) => polygon.map(ringToPath)).join(" ");
+  }
+  return "";
+}

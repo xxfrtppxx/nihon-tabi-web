@@ -1,4 +1,4 @@
-import { getAccessToken, getRefreshToken, setTokens } from "./token-store";
+import { getAccessToken, setTokens } from "./token-store";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
 
@@ -21,7 +21,11 @@ async function request<T>(
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
 
   if (res.status === 401 && retry) {
     const refreshed = await tryRefresh();
@@ -38,23 +42,20 @@ async function request<T>(
 }
 
 async function tryRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+  if (!getAccessToken()) return false;
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      credentials: "include",
+      body: "{}",
     });
     if (!res.ok) {
       setTokens(null);
       return false;
     }
-    const data = (await res.json()) as {
-      accessToken: string;
-      refreshToken: string;
-    };
-    setTokens(data);
+    const data = (await res.json()) as { accessToken: string };
+    setTokens({ accessToken: data.accessToken });
     return true;
   } catch {
     setTokens(null);
@@ -175,6 +176,31 @@ export const visitsApi = {
     }),
   remove: (id: string) =>
     request<{ success: boolean }>(`/visits/${id}`, { method: "DELETE" }),
+};
+
+export const photosApi = {
+  presign: (visitId: string, contentType: string) =>
+    request<{ uploadUrl: string; publicUrl: string }>(
+      `/visits/${visitId}/photos/presign`,
+      { method: "POST", body: JSON.stringify({ contentType }) },
+    ),
+  add: (visitId: string, url: string) =>
+    request<VisitPhoto>(`/visits/${visitId}/photos`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  remove: (photoId: string) =>
+    request<{ success: boolean }>(`/photos/${photoId}`, { method: "DELETE" }),
+  upload: async (visitId: string, file: File) => {
+    const { uploadUrl, publicUrl } = await photosApi.presign(visitId, file.type);
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!res.ok) throw new ApiError(res.status, "Upload failed");
+    return photosApi.add(visitId, publicUrl);
+  },
 };
 
 export interface Stats {
