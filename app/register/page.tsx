@@ -23,7 +23,7 @@ export default function RegisterPage() {
       await register(email, password, displayName);
       router.replace("/map");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "สมัครสมาชิกไม่สำเร็จ");
+      setError(err instanceof ApiError ? err.message : "Sign up failed");
     } finally {
       setSubmitting(false);
     }
@@ -31,10 +31,10 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-57px)] max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-2xl font-bold">สมัครสมาชิก Nihon Tabi</h1>
+      <h1 className="text-2xl font-bold">Sign up for Nihon Tabi</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          ชื่อที่แสดง
+          Display name
           <input
             type="text"
             required
@@ -44,7 +44,7 @@ export default function RegisterPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          อีเมล
+          Email
           <input
             type="email"
             required
@@ -54,7 +54,7 @@ export default function RegisterPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)
+          Password (at least 8 characters)
           <input
             type="password"
             required
@@ -70,13 +70,13 @@ export default function RegisterPage() {
           disabled={submitting}
           className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
         >
-          {submitting ? "กำลังสมัคร..." : "สมัครสมาชิก"}
+          {submitting ? "Signing up..." : "Sign up"}
         </button>
       </form>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        มีบัญชีอยู่แล้ว?{" "}
+        Already have an account?{" "}
         <Link href="/login" className="underline">
-          เข้าสู่ระบบ
+          Log in
         </Link>
       </p>
     </main>

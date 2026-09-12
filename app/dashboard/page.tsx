@@ -18,34 +18,35 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-bold">สถิติการเที่ยวญี่ปุ่น</h1>
+      <h1 className="mb-6 text-2xl font-bold">Your Japan travel stats</h1>
 
-      {statsQuery.isLoading && <p>กำลังโหลด...</p>}
+      {statsQuery.isLoading && <p>Loading...</p>}
 
       {stats && (
         <>
           <div className="mb-8 grid grid-cols-3 gap-4">
             <div className="rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
               <p className="text-2xl font-bold">{stats.visitedCount}</p>
-              <p className="text-sm text-neutral-500">ไปแล้ว</p>
+              <p className="text-sm text-neutral-500">Visited</p>
             </div>
             <div className="rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
               <p className="text-2xl font-bold">{stats.wantToGoCount}</p>
-              <p className="text-sm text-neutral-500">อยากไป</p>
+              <p className="text-sm text-neutral-500">Want to go</p>
             </div>
             <div className="rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
               <p className="text-2xl font-bold">{stats.percentageVisited}%</p>
-              <p className="text-sm text-neutral-500">ของทั้งหมด</p>
+              <p className="text-sm text-neutral-500">of all Japan</p>
             </div>
           </div>
 
           {stats.totalMunicipalities === 0 ? (
             <p className="text-neutral-500">
-              ยังไม่มีข้อมูลเมือง/เขตในระบบ (รอ seed ข้อมูลจาก GADM) สถิติจะคำนวณได้เต็มรูปแบบหลังจากนั้น
+              No municipality data yet (waiting on the GADM seed). Stats will be
+              fully available after that.
             </p>
           ) : (
             <div>
-              <h2 className="mb-3 text-sm font-semibold text-neutral-500">แยกตามภูมิภาค</h2>
+              <h2 className="mb-3 text-sm font-semibold text-neutral-500">By region</h2>
               <ul className="flex flex-col gap-2">
                 {stats.byRegion.map((r) => (
                   <li key={r.region}>

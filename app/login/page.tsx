@@ -22,7 +22,7 @@ export default function LoginPage() {
       await login(email, password);
       router.replace("/map");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "เข้าสู่ระบบไม่สำเร็จ");
+      setError(err instanceof ApiError ? err.message : "Login failed");
     } finally {
       setSubmitting(false);
     }
@@ -30,10 +30,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-57px)] max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-2xl font-bold">เข้าสู่ระบบ Nihon Tabi</h1>
+      <h1 className="text-2xl font-bold">Log in to Nihon Tabi</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          อีเมล
+          Email
           <input
             type="email"
             required
@@ -43,7 +43,7 @@ export default function LoginPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          รหัสผ่าน
+          Password
           <input
             type="password"
             required
@@ -58,13 +58,13 @@ export default function LoginPage() {
           disabled={submitting}
           className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
         >
-          {submitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          {submitting ? "Logging in..." : "Log in"}
         </button>
       </form>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        ยังไม่มีบัญชี?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/register" className="underline">
-          สมัครสมาชิก
+          Sign up
         </Link>
       </p>
     </main>

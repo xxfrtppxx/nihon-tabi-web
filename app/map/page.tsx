@@ -201,22 +201,22 @@ export default function MapPage() {
       <aside className="flex w-80 flex-col overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
         {prefectureId === null ? (
           <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-neutral-500">จังหวัด</h2>
+            <h2 className="text-sm font-semibold text-neutral-500">Prefectures</h2>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาจังหวัด..."
+              placeholder="Search prefectures..."
               className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
-            {prefecturesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
+            {prefecturesQuery.isLoading && <p className="text-sm">Loading...</p>}
             {prefecturesQuery.data?.length === 0 && (
               <p className="text-sm text-neutral-500">
-                ยังไม่มีข้อมูลจังหวัด (รอ seed ข้อมูลจาก GADM)
+                No prefecture data yet (waiting on the GADM seed)
               </p>
             )}
             {prefecturesQuery.data && filteredPrefectures.length === 0 && (
-              <p className="text-sm text-neutral-500">ไม่พบจังหวัดที่ค้นหา</p>
+              <p className="text-sm text-neutral-500">No matching prefectures</p>
             )}
             <ul className="flex flex-col gap-1">
               {filteredPrefectures.map((pref) => (
@@ -238,14 +238,14 @@ export default function MapPage() {
                 onClick={backToCountry}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
-                ← ดูทั้งประเทศ
+                ← View whole country
               </button>
               <div className="mt-2 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-neutral-500">
-                  เมือง/เขต
+                  Cities &amp; districts
                   {selectedPrefecture && (
                     <span className="ml-1 font-normal">
-                      ใน {placeName(selectedPrefecture.nameEn, selectedPrefecture.nameJa)}
+                      in {placeName(selectedPrefecture.nameEn, selectedPrefecture.nameJa)}
                     </span>
                   )}
                 </h2>
@@ -254,7 +254,7 @@ export default function MapPage() {
                     onClick={backToPrefecture}
                     className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                   >
-                    ดูทั้งจังหวัด
+                    View whole prefecture
                   </button>
                 )}
               </div>
@@ -263,12 +263,12 @@ export default function MapPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาเมือง/เขต..."
+              placeholder="Search cities & districts..."
               className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
-            {municipalitiesQuery.isLoading && <p className="text-sm">กำลังโหลด...</p>}
+            {municipalitiesQuery.isLoading && <p className="text-sm">Loading...</p>}
             {municipalitiesQuery.data && filteredMunicipalities.length === 0 && (
-              <p className="text-sm text-neutral-500">ไม่พบเมือง/เขตที่ค้นหา</p>
+              <p className="text-sm text-neutral-500">No matching cities or districts</p>
             )}
             <ul className="flex flex-col gap-1">
               {filteredMunicipalities.map((m) => {
@@ -292,7 +292,7 @@ export default function MapPage() {
                               : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
                           }`}
                         >
-                          {visit.status === "visited" ? "ไปแล้ว" : "อยากไป"}
+                          {visit.status === "visited" ? "Visited" : "Want to go"}
                         </span>
                       )}
                     </button>

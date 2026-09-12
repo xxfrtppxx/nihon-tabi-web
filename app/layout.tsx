@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Nihon Tabi",
-  description: "บันทึกจังหวัด/เมืองในญี่ปุ่นที่เคยไปแล้ว",
+  description: "Track the prefectures and cities you've visited in Japan",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="th"
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

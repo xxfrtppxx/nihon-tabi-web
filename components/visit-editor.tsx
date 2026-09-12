@@ -65,8 +65,8 @@ export function VisitEditor({
           <div className="flex gap-2">
             {(
               [
-                { value: "visited", label: "ไปแล้ว" },
-                { value: "want_to_go", label: "อยากไป" },
+                { value: "visited", label: "Visited" },
+                { value: "want_to_go", label: "Want to go" },
               ] as const
             ).map((option) => (
               <button
@@ -85,7 +85,7 @@ export function VisitEditor({
           </div>
 
           <label className="flex flex-col gap-1 text-sm">
-            วันที่ไป
+            Date visited
             <input
               type="date"
               value={visitedOn ?? ""}
@@ -95,7 +95,7 @@ export function VisitEditor({
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            โน้ต
+            Note
             <textarea
               value={note ?? ""}
               onChange={(e) => setNote(e.target.value)}
@@ -105,7 +105,7 @@ export function VisitEditor({
           </label>
 
           <div className="flex flex-col gap-1 text-sm">
-            คะแนน
+            Rating
             <div className="flex gap-1 text-xl">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -121,7 +121,7 @@ export function VisitEditor({
           </div>
 
           {saveMutation.isError && (
-            <p className="text-sm text-red-600">บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง</p>
+            <p className="text-sm text-red-600">Failed to save. Please try again.</p>
           )}
 
           <div className="flex gap-2">
@@ -131,7 +131,7 @@ export function VisitEditor({
               disabled={saveMutation.isPending}
               className="flex-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
             >
-              {saveMutation.isPending ? "กำลังบันทึก..." : "บันทึก"}
+              {saveMutation.isPending ? "Saving..." : "Save"}
             </button>
             {existingVisit && (
               <button
@@ -140,7 +140,7 @@ export function VisitEditor({
                 disabled={deleteMutation.isPending}
                 className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50 dark:border-red-800 dark:text-red-400"
               >
-                ลบ
+                Delete
               </button>
             )}
             <button
@@ -148,7 +148,7 @@ export function VisitEditor({
               onClick={onClose}
               className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700"
             >
-              ปิด
+              Close
             </button>
           </div>
         </div>

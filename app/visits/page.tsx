@@ -17,12 +17,12 @@ export default function VisitsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-bold">รายการที่ไปแล้ว</h1>
+      <h1 className="mb-6 text-2xl font-bold">Your visits</h1>
 
-      {visitsQuery.isLoading && <p>กำลังโหลด...</p>}
+      {visitsQuery.isLoading && <p>Loading...</p>}
       {visitsQuery.data?.length === 0 && (
         <p className="text-neutral-500">
-          ยังไม่มีรายการ — ไปหน้าแผนที่แล้วเลือกเมืองเพื่อบันทึกได้เลย
+          No visits yet — head to the map and pick a city to log one.
         </p>
       )}
 
@@ -45,7 +45,7 @@ export default function VisitsPage() {
                 </p>
                 {visit.visitedOn && (
                   <p className="text-sm text-neutral-500">
-                    {new Date(visit.visitedOn).toLocaleDateString("th-TH")}
+                    {new Date(visit.visitedOn).toLocaleDateString("en-US")}
                   </p>
                 )}
               </div>
@@ -56,7 +56,7 @@ export default function VisitsPage() {
                     : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
                 }`}
               >
-                {visit.status === "visited" ? "ไปแล้ว" : "อยากไป"}
+                {visit.status === "visited" ? "Visited" : "Want to go"}
               </span>
             </div>
             {visit.rating ? (
