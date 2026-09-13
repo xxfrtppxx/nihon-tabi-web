@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, statsApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -445,21 +446,19 @@ export default function MapPage() {
                 const visits = visitsByMunicipalityId.get(m.id) ?? [];
                 const hasVisited = visits.some((v) => v.status === "visited");
                 const hasWant = visits.some((v) => v.status === "want_to_go");
+                const isSelected = selectedMunicipality?.id === m.id;
                 return (
-                  <li key={m.id}>
+                  <li
+                    key={m.id}
+                    className={`rounded-[var(--radius-sm)] ${isSelected ? "" : "hover:bg-[var(--accent-100)]"}`}
+                    style={isSelected ? { background: "var(--accent)", color: "#fff" } : undefined}
+                  >
                     <button
                       onClick={() => selectMunicipality(m)}
-                      className={`flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] px-3 py-1.5 text-left text-sm ${
-                        selectedMunicipality?.id === m.id ? "" : "hover:bg-[var(--accent-100)]"
-                      }`}
-                      style={
-                        selectedMunicipality?.id === m.id
-                          ? { background: "var(--accent)", color: "#fff" }
-                          : undefined
-                      }
+                      className="flex w-full items-center justify-between gap-2 px-3 pt-1.5 text-left text-sm"
                     >
                       <span>{placeName(m.nameEn, m.nameJa)}</span>
-                      <span className="flex shrink-0 gap-1">
+                      <span className="flex shrink-0 items-center gap-1">
                         {hasVisited && (
                           <span
                             className="rounded-full px-2 py-0.5 text-xs"
@@ -478,6 +477,13 @@ export default function MapPage() {
                         )}
                       </span>
                     </button>
+                    <Link
+                      href={`/city/${m.prefectureId}/${m.id}`}
+                      className="block px-3 pb-1.5 text-right text-xs hover:underline"
+                      style={{ color: isSelected ? "#fff" : "var(--accent)" }}
+                    >
+                      View city page →
+                    </Link>
                   </li>
                 );
               })}
