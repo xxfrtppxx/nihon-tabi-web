@@ -9,6 +9,7 @@ import { placeName } from "@/lib/format";
 import { boundsOfFeatureCollection, boundsOfGeometry, type LngLatBounds } from "@/lib/geo";
 import { VisitEditor } from "@/components/visit-editor";
 import { CoverageDotMatrix } from "@/components/coverage-dot-matrix";
+import { AtlasSummaryPanel } from "@/components/atlas-summary-panel";
 
 const MapView = dynamic(
   () => import("@/components/map-view").then((mod) => mod.MapView),
@@ -486,6 +487,10 @@ export default function MapPage() {
           +
         </button>
       </main>
+
+      {prefectureId === null && !selectedMunicipality && (
+        <AtlasSummaryPanel visits={visitsQuery.data ?? []} />
+      )}
 
       {editorRequest && (
         <VisitEditor
