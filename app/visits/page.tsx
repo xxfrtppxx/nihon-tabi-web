@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { visitsApi, type Visit, type VisitStatus } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -151,7 +152,12 @@ export default function VisitsPage() {
                     <div>
                       <div className="flex flex-wrap items-baseline gap-2">
                         <h3 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                          {visit.municipality.nameEn}
+                          <Link
+                            href={`/city/${visit.municipality.prefectureId}/${visit.municipality.id}`}
+                            className="hover:underline"
+                          >
+                            {visit.municipality.nameEn}
+                          </Link>
                         </h3>
                         <span className="text-sm text-neutral-600">
                           {placeName(
