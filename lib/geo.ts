@@ -49,6 +49,22 @@ export function centerOfBounds(bounds: LngLatBounds): [number, number] {
   return [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2];
 }
 
+// Bounding box of a handful of [lng, lat] points (a trip's day-by-day
+// route, say) rather than a polygon — padded so a route that's a single
+// point, or a straight line, still gets a sane box to project into instead
+// of a zero-size one.
+export function boundsOfPoints(points: [number, number][]): LngLatBounds | null {
+  if (points.length === 0) return null;
+  const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [lng, lat] of points) extendBbox(bbox, lng, lat);
+  const padLng = Math.max(0.3, (bbox[2] - bbox[0]) * 0.2);
+  const padLat = Math.max(0.3, (bbox[3] - bbox[1]) * 0.2);
+  return [
+    [bbox[0] - padLng, bbox[1] - padLat],
+    [bbox[2] + padLng, bbox[3] + padLat],
+  ];
+}
+
 // Projects a polygon's lng/lat rings into a square SVG viewBox (0..viewSize
 // on each axis), preserving aspect ratio and flipping the Y axis (SVG grows
 // downward, latitude grows upward) — just enough to draw the shape as a

@@ -1,178 +1,145 @@
 "use client";
 
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { geoFilesApi, visitsApi } from "@/lib/api";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { tripsApi } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { DotMapSvg, useDotGrid, type DotStatus, type LngLat } from "@/components/dot-map";
-
-// Static placeholder — Trips (grouping visits into a journey) has no
-// backend support yet (would need a new entity in the separate
-// nihon-tabi-api repo). This page exists only so the nav's Trips tab has
-// somewhere to land; the data below is illustrative, not real.
-const SAMPLE_TRIP = {
-  season: "Spring 2025",
-  days: 9,
-  title: "Kansai loop",
-  cityCount: 7,
-  photoCount: 41,
-  km: 612,
-  itinerary: [
-    { day: 1, city: "Osaka", ja: "大阪市", note: "Landed, first taste of takoyaki in Dotonbori." },
-    { day: 2, city: "Osaka", ja: "大阪市", note: "Osaka Castle, Shinsekai at night." },
-    { day: 3, city: "Kyoto", ja: "京都市", note: "Fushimi Inari at 5am — empty gates all the way up." },
-    { day: 4, city: "Kyoto", ja: "京都市", note: "Arashiyama, too many people." },
-    { day: 5, city: "Nara", ja: "奈良市", note: "Deer park, Todai-ji." },
-  ],
-};
-
-// Approximate real centroids for the sample itinerary's cities — the trip
-// itself is illustrative, but the route it draws is a genuine path.
-const ROUTE: LngLat[] = [
-  [135.5, 34.69], // Osaka
-  [135.77, 35.01], // Kyoto
-  [135.83, 34.69], // Nara
-  [135.2, 34.69], // Kobe
-  [132.46, 34.39], // Hiroshima
-];
-const ROUTE_BOUNDS: [[number, number], [number, number]] = [
-  [131.6, 33.6],
-  [136.8, 36.1],
-];
+import { formatDate } from "@/lib/format";
 
 export default function TripsPage() {
   const { user, loading } = useRequireAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
 
-  const visitsQuery = useQuery({
-    queryKey: ["visits"],
-    queryFn: () => visitsApi.list(),
+  const tripsQuery = useQuery({
+    queryKey: ["trips"],
+    queryFn: tripsApi.list,
     enabled: !!user,
   });
-  const prefecturesGeoJSONQuery = useQuery({
-    queryKey: ["geo-files", "prefectures"],
-    queryFn: geoFilesApi.prefectures,
-    enabled: !!user,
-    staleTime: Infinity,
-  });
 
-  const classify = useMemo(() => {
-    const visited = new Set(
-      (visitsQuery.data ?? [])
-        .filter((v) => v.status === "visited")
-        .map((v) => v.municipality.prefectureId),
-    );
-    return (id: number): DotStatus => (visited.has(id) ? "visited" : "none");
-  }, [visitsQuery.data]);
-
-  const grid = useDotGrid({
-    geojson: prefecturesGeoJSONQuery.data ?? null,
-    bounds: ROUTE_BOUNDS,
-    classify,
-    cols: 36,
-    rows: 28,
-    viewSize: 320,
+  const createMutation = useMutation({
+    mutationFn: () => tripsApi.create({ title: title.trim() }),
+    onSuccess: (trip) => {
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+      router.push(`/trips/${trip.id}`);
+    },
   });
 
   if (loading || !user) return null;
 
+  const trips = tripsQuery.data ?? [];
+
   return (
-    <div className="flex h-[calc(100vh-57px)]">
-      <div className="flex flex-1 flex-col overflow-y-auto px-10 py-8">
-        <div
-          className="mb-6 rounded-[var(--radius-md)] px-4 py-2 text-xs"
-          style={{ background: "var(--plan-100)", color: "var(--plan-700)" }}
-        >
-          Preview — trips aren&apos;t saved yet. This page shows what grouping
-          your visits into a journey could look like.
-        </div>
-
-        <div
-          className="flex items-end justify-between border-b pb-[18px]"
-          style={{ borderColor: "var(--divider)" }}
-        >
-          <div>
-            <p className="mb-2.5 text-[10px] font-semibold tracking-[0.14em] text-neutral-500 uppercase">
-              {SAMPLE_TRIP.season} · {SAMPLE_TRIP.days} days
-            </p>
-            <h1 className="text-[54px] leading-[0.9] font-black tracking-tight">{SAMPLE_TRIP.title}</h1>
-          </div>
-          <div className="flex gap-6 text-left">
-            <div>
-              <p className="text-[40px] leading-none font-extrabold">{SAMPLE_TRIP.cityCount}</p>
-              <p className="mt-1.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase">Cities</p>
-            </div>
-            <div>
-              <p className="text-[40px] leading-none font-extrabold">{SAMPLE_TRIP.photoCount}</p>
-              <p className="mt-1.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase">Photos</p>
-            </div>
-            <div>
-              <p className="text-[40px] leading-none font-extrabold">{SAMPLE_TRIP.km}</p>
-              <p className="mt-1.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase">km</p>
-            </div>
-          </div>
-        </div>
-
-        <ul className="mt-2">
-          {SAMPLE_TRIP.itinerary.map((d) => (
-            <li
-              key={d.day}
-              className="grid grid-cols-[78px_1fr_220px] items-center gap-6 border-b py-4"
-              style={{ borderColor: "var(--neutral-300)" }}
-            >
-              <div>
-                <p className="text-xs font-semibold text-neutral-500 uppercase">Day</p>
-                <p className="mt-1 text-[28px] leading-none font-extrabold">{d.day}</p>
-              </div>
-              <div>
-                <div className="flex items-baseline gap-2.5">
-                  <span className="text-lg font-bold">{d.city}</span>
-                  <span className="text-[13px] text-neutral-500">{d.ja}</span>
-                </div>
-                <p className="mt-1 text-[13px] text-neutral-600">{d.note}</p>
-              </div>
-              <div className="flex justify-start gap-0.5">
-                <div className="h-[74px] w-[98px] rounded-[var(--radius-md)]" style={{ background: "var(--neutral-200)" }} />
-                <div className="h-[74px] w-[98px] rounded-[var(--radius-md)]" style={{ background: "var(--neutral-200)" }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <aside className="flex w-[400px] flex-none flex-col border-l" style={{ borderColor: "var(--divider)" }}>
-        <div className="relative flex-1">
-          {grid.dots.length > 0 && (
-            <DotMapSvg
-              dots={grid.dots}
-              viewSize={320}
-              cellSize={grid.cellSize}
-              project={grid.project}
-              boundary={grid.boundaryPath}
-              route={ROUTE}
-            />
-          )}
-        </div>
-        <div className="flex gap-2 border-t p-5" style={{ borderColor: "var(--divider)" }}>
+    <main className="mx-auto max-w-3xl px-6 py-8">
+      <div className="mb-6 flex items-end justify-between">
+        <h1 className="text-2xl font-extrabold tracking-tight">Your trips</h1>
+        {!creating && (
           <button
             type="button"
-            disabled
-            title="Trips aren't saved yet"
-            className="flex-1 cursor-not-allowed rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white opacity-60"
+            onClick={() => setCreating(true)}
+            className="rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white"
             style={{ background: "var(--accent)" }}
           >
-            Export trip
+            + New trip
           </button>
-          <button
-            type="button"
-            disabled
-            title="Trips aren't saved yet"
-            className="flex-1 cursor-not-allowed rounded-[var(--radius-md)] border px-4 py-2 text-sm font-semibold opacity-60"
-            style={{ borderColor: "var(--divider)" }}
-          >
-            Add a day
-          </button>
-        </div>
-      </aside>
-    </div>
+        )}
+      </div>
+
+      {creating && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (title.trim()) createMutation.mutate();
+          }}
+          className="mb-8 flex flex-col gap-3 rounded-[var(--radius-lg)] p-5"
+          style={{ background: "var(--surface)", border: "1px solid var(--divider)" }}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            Trip title
+            <input
+              type="text"
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Kansai loop"
+              className="rounded-[var(--radius-md)] border px-3 py-2"
+              style={{ borderColor: "var(--divider)", background: "var(--background)" }}
+            />
+          </label>
+          {createMutation.isError && (
+            <p className="text-sm" style={{ color: "var(--plan-700)" }}>
+              Failed to create trip. Please try again.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={!title.trim() || createMutation.isPending}
+              className="rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: "var(--accent)" }}
+            >
+              {createMutation.isPending ? "Creating..." : "Create trip"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(false);
+                setTitle("");
+              }}
+              className="rounded-[var(--radius-md)] border px-4 py-2 text-sm font-semibold"
+              style={{ borderColor: "var(--divider)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tripsQuery.isLoading && <p className="text-neutral-500">Loading...</p>}
+
+      {tripsQuery.data && trips.length === 0 && (
+        <p className="text-neutral-500">
+          No trips yet — group a few visits into a journey to see it here.
+        </p>
+      )}
+
+      <ul className="flex flex-col">
+        {trips.map((trip) => (
+          <li key={trip.id}>
+            <Link
+              href={`/trips/${trip.id}`}
+              className="flex items-center justify-between gap-4 border-b py-5 hover:bg-[var(--accent-100)]"
+              style={{ borderColor: "var(--divider)" }}
+            >
+              <div>
+                <h2 className="text-xl font-extrabold tracking-tight">{trip.title}</h2>
+                <p className="mt-1 text-sm text-neutral-600">
+                  {trip.startDate ? formatDate(trip.startDate) : "No dates yet"}
+                  {trip.endDate ? ` – ${formatDate(trip.endDate)}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-none gap-5 text-right">
+                <div>
+                  <p className="text-lg font-extrabold tabular-nums">{trip.dayCount}</p>
+                  <p className="text-xs text-neutral-500 uppercase">Days</p>
+                </div>
+                <div>
+                  <p className="text-lg font-extrabold tabular-nums">{trip.cityCount}</p>
+                  <p className="text-xs text-neutral-500 uppercase">Cities</p>
+                </div>
+                <div>
+                  <p className="text-lg font-extrabold tabular-nums">{trip.totalKm}</p>
+                  <p className="text-xs text-neutral-500 uppercase">km</p>
+                </div>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </main>
   );
 }

@@ -215,3 +215,58 @@ export interface Stats {
 export const statsApi = {
   me: () => request<Stats>("/stats/me"),
 };
+
+export interface TripDay {
+  id: string;
+  tripId: string;
+  dayNumber: number;
+  municipalityId: number;
+  note: string | null;
+  municipality: Municipality & { prefecture: Prefecture };
+}
+
+export interface Trip {
+  id: string;
+  userId: string;
+  title: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  days: TripDay[];
+  cityCount: number;
+  dayCount: number;
+  totalKm: number;
+}
+
+export interface TripInput {
+  title: string;
+  startDate?: string;
+  endDate?: string;
+  days?: { dayNumber: number; municipalityId: number; note?: string }[];
+}
+
+export interface TripDayInput {
+  dayNumber: number;
+  municipalityId: number;
+  note?: string;
+}
+
+export const tripsApi = {
+  list: () => request<Trip[]>("/trips"),
+  get: (id: string) => request<Trip>(`/trips/${id}`),
+  create: (data: TripInput) =>
+    request<Trip>("/trips", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Omit<TripInput, "days">>) =>
+    request<Trip>(`/trips/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  remove: (id: string) => request<{ success: boolean }>(`/trips/${id}`, { method: "DELETE" }),
+  addDay: (tripId: string, data: TripDayInput) =>
+    request<Trip>(`/trips/${tripId}/days`, { method: "POST", body: JSON.stringify(data) }),
+  updateDay: (tripId: string, dayId: string, data: Partial<TripDayInput>) =>
+    request<Trip>(`/trips/${tripId}/days/${dayId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  removeDay: (tripId: string, dayId: string) =>
+    request<Trip>(`/trips/${tripId}/days/${dayId}`, { method: "DELETE" }),
+};
