@@ -51,7 +51,10 @@ export function VisitEditor({
 
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-6 dark:bg-neutral-900 sm:rounded-2xl">
+      <div
+        className="w-full max-w-md rounded-t-[var(--radius-lg)] p-6 sm:rounded-[var(--radius-lg)]"
+        style={{ background: "var(--surface)" }}
+      >
         {municipality && (
           <div className="mb-4">
             <h2 className="text-lg font-bold">
@@ -134,15 +137,17 @@ function VisitList({
         {visits.map((visit) => (
           <li
             key={visit.id}
-            className="flex flex-col gap-2 rounded-lg border border-neutral-300 p-3 text-sm dark:border-neutral-700"
+            className="flex flex-col gap-2 rounded-[var(--radius-md)] border p-3 text-sm"
+            style={{ borderColor: "var(--divider)" }}
           >
             <div className="flex items-center justify-between">
               <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
+                className="rounded-full px-2 py-0.5 text-xs"
+                style={
                   visit.status === "visited"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                    : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                }`}
+                    ? { background: "var(--accent-100)", color: "var(--accent-700)" }
+                    : { background: "var(--plan-100)", color: "var(--plan-700)" }
+                }
               >
                 {visit.status === "visited" ? "Visited" : "Want to go"}
               </span>
@@ -167,17 +172,21 @@ function VisitList({
             )}
 
             {visit.rating ? (
-              <p className="text-amber-500">{"★".repeat(visit.rating)}</p>
+              <p style={{ color: "var(--accent)" }}>{"★".repeat(visit.rating)}</p>
             ) : null}
             {visit.note && (
               <p className="text-neutral-600 dark:text-neutral-400">{visit.note}</p>
             )}
 
-            <div className="flex items-center gap-4 border-t border-neutral-200 pt-2 dark:border-neutral-800">
+            <div
+              className="flex items-center gap-4 border-t pt-2"
+              style={{ borderColor: "var(--divider)" }}
+            >
               <button
                 type="button"
                 onClick={() => onSelect(visit)}
-                className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                className="text-xs font-medium hover:underline"
+                style={{ color: "var(--accent)" }}
               >
                 Edit
               </button>
@@ -197,14 +206,16 @@ function VisitList({
         <button
           type="button"
           onClick={onAddNew}
-          className="flex-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
+          className="flex-1 rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-white"
+          style={{ background: "var(--accent)" }}
         >
           + Add new record
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700"
+          className="rounded-[var(--radius-md)] border px-4 py-2 text-sm font-medium"
+          style={{ borderColor: "var(--divider)" }}
         >
           Close
         </button>
@@ -212,7 +223,10 @@ function VisitList({
 
       {confirmDelete && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 dark:bg-neutral-900">
+          <div
+            className="w-full max-w-sm rounded-[var(--radius-lg)] p-5"
+            style={{ background: "var(--surface)" }}
+          >
             <p className="mb-4 text-sm">Delete this record? This can&apos;t be undone.</p>
             {deleteMutation.isError && (
               <p className="mb-4 text-sm text-red-600">Failed to delete. Please try again.</p>
@@ -221,7 +235,8 @@ function VisitList({
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700"
+                className="rounded-[var(--radius-md)] border px-4 py-2 text-sm font-medium"
+                style={{ borderColor: "var(--divider)" }}
               >
                 Cancel
               </button>
@@ -439,7 +454,8 @@ function VisitEntryForm({
         <button
           type="button"
           onClick={onBack}
-          className="self-start text-xs text-blue-600 hover:underline dark:text-blue-400"
+          className="self-start text-xs hover:underline"
+          style={{ color: "var(--accent)" }}
         >
           ← Back to records
         </button>
@@ -452,7 +468,8 @@ function VisitEntryForm({
             value={pickerPrefectureId ?? ""}
             disabled={municipalityLocked}
             onChange={(e) => setPickerPrefectureId(Number(e.target.value))}
-            className="rounded border border-neutral-300 px-3 py-2 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800"
+            className="rounded-[var(--radius-md)] border px-3 py-2 disabled:opacity-60"
+            style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
           >
             <option value="" disabled>
               Select prefecture
@@ -473,7 +490,8 @@ function VisitEntryForm({
               const m = municipalitiesQuery.data?.find((m) => m.id === Number(e.target.value));
               if (m) onMunicipalityChange(m);
             }}
-            className="rounded border border-neutral-300 px-3 py-2 disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-800"
+            className="rounded-[var(--radius-md)] border px-3 py-2 disabled:opacity-60"
+            style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
           >
             <option value="" disabled>
               Select city/district
@@ -498,11 +516,12 @@ function VisitEntryForm({
             key={option.value}
             type="button"
             onClick={() => handleStatusChange(option.value)}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+            className="flex-1 rounded-[var(--radius-md)] border px-3 py-2 text-sm font-medium"
+            style={
               status === option.value
-                ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900"
-                : "border-neutral-300 dark:border-neutral-700"
-            }`}
+                ? { borderColor: "var(--accent)", background: "var(--accent)", color: "#fff" }
+                : { borderColor: "var(--divider)" }
+            }
           >
             {option.label}
           </button>
@@ -534,7 +553,8 @@ function VisitEntryForm({
             value={visitedOn ? formatDate(visitedOn) : ""}
             placeholder="dd/mm/yyyy"
             onClick={() => dateInputRef.current?.showPicker?.()}
-            className="w-full cursor-pointer rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+            className="w-full cursor-pointer rounded-[var(--radius-md)] border px-3 py-2"
+            style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
           />
         </div>
       </label>
@@ -545,7 +565,8 @@ function VisitEntryForm({
           value={note ?? ""}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800"
+          className="rounded-[var(--radius-md)] border px-3 py-2"
+          style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
         />
       </label>
 
@@ -557,7 +578,7 @@ function VisitEntryForm({
               key={n}
               type="button"
               onClick={() => setRating(n === rating ? 0 : n)}
-              className={n <= rating ? "text-amber-500" : "text-neutral-300 dark:text-neutral-700"}
+              style={{ color: n <= rating ? "var(--accent)" : "var(--neutral-400)" }}
             >
               ★
             </button>
@@ -593,7 +614,8 @@ function VisitEntryForm({
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadPhotoMutation.isPending || !municipality}
               title={!municipality ? "Pick a city first" : undefined}
-              className="flex h-16 w-16 items-center justify-center rounded border border-dashed border-neutral-300 text-2xl text-neutral-400 disabled:opacity-50 dark:border-neutral-700"
+              className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-sm)] border border-dashed text-2xl text-neutral-400 disabled:opacity-50"
+              style={{ borderColor: "var(--divider)" }}
             >
               {uploadPhotoMutation.isPending ? "…" : "+"}
             </button>
@@ -622,7 +644,8 @@ function VisitEntryForm({
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending || !municipality}
           title={!municipality ? "Pick a city first" : undefined}
-          className="flex-1 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+          className="flex-1 rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          style={{ background: "var(--accent)" }}
         >
           {saveMutation.isPending ? "Saving..." : "Save"}
         </button>
@@ -631,7 +654,7 @@ function VisitEntryForm({
             type="button"
             onClick={() => deleteMutation.mutate()}
             disabled={deleteMutation.isPending}
-            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50 dark:border-red-800 dark:text-red-400"
+            className="rounded-[var(--radius-md)] border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50 dark:border-red-800 dark:text-red-400"
           >
             Delete
           </button>
@@ -639,7 +662,8 @@ function VisitEntryForm({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700"
+          className="rounded-[var(--radius-md)] border px-4 py-2 text-sm font-medium"
+          style={{ borderColor: "var(--divider)" }}
         >
           Close
         </button>

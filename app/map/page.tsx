@@ -8,6 +8,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { placeName } from "@/lib/format";
 import { boundsOfFeatureCollection, boundsOfGeometry, type LngLatBounds } from "@/lib/geo";
 import { VisitEditor } from "@/components/visit-editor";
+import { CoverageDotMatrix } from "@/components/coverage-dot-matrix";
 
 const MapView = dynamic(
   () => import("@/components/map-view").then((mod) => mod.MapView),
@@ -317,7 +318,10 @@ export default function MapPage() {
 
   return (
     <div className="flex h-[calc(100vh-57px)]">
-      <aside className="flex w-80 flex-col overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
+      <aside
+        className="flex w-80 flex-col overflow-y-auto border-r p-4"
+        style={{ borderColor: "var(--divider)" }}
+      >
         {prefectureId === null ? (
           <div className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold text-neutral-500">Prefectures</h2>
@@ -326,7 +330,8 @@ export default function MapPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search prefectures..."
-              className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+              className="rounded-[var(--radius-md)] border px-3 py-1.5 text-sm"
+              style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
             />
             {prefecturesQuery.isLoading && <p className="text-sm">Loading...</p>}
             {prefecturesQuery.data?.length === 0 && (
@@ -342,7 +347,7 @@ export default function MapPage() {
                 <li key={pref.id}>
                   <button
                     onClick={() => selectPrefecture(pref.id)}
-                    className="w-full rounded px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    className="w-full rounded-[var(--radius-sm)] px-3 py-1.5 text-left text-sm hover:bg-[var(--accent-100)]"
                   >
                     {placeName(pref.nameEn, pref.nameJa)}
                   </button>
@@ -355,7 +360,8 @@ export default function MapPage() {
             <div>
               <button
                 onClick={backToCountry}
-                className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                className="text-xs hover:underline"
+                style={{ color: "var(--accent)" }}
               >
                 ← View whole country
               </button>
@@ -371,7 +377,8 @@ export default function MapPage() {
                 {selectedMunicipality !== null && (
                   <button
                     onClick={backToPrefecture}
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-xs hover:underline"
+                    style={{ color: "var(--accent)" }}
                   >
                     View whole prefecture
                   </button>
@@ -383,7 +390,8 @@ export default function MapPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search cities & districts..."
-              className="rounded border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+              className="rounded-[var(--radius-md)] border px-3 py-1.5 text-sm"
+              style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
             />
             {municipalitiesQuery.isLoading && <p className="text-sm">Loading...</p>}
             {municipalitiesQuery.data && filteredMunicipalities.length === 0 && (
@@ -398,21 +406,30 @@ export default function MapPage() {
                   <li key={m.id}>
                     <button
                       onClick={() => selectMunicipality(m)}
-                      className={`flex w-full items-center justify-between gap-2 rounded px-3 py-1.5 text-left text-sm ${
-                        selectedMunicipality?.id === m.id
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                          : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      className={`flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] px-3 py-1.5 text-left text-sm ${
+                        selectedMunicipality?.id === m.id ? "" : "hover:bg-[var(--accent-100)]"
                       }`}
+                      style={
+                        selectedMunicipality?.id === m.id
+                          ? { background: "var(--accent)", color: "#fff" }
+                          : undefined
+                      }
                     >
                       <span>{placeName(m.nameEn, m.nameJa)}</span>
                       <span className="flex shrink-0 gap-1">
                         {hasVisited && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-xs"
+                            style={{ background: "var(--accent-100)", color: "var(--accent-700)" }}
+                          >
                             Visited
                           </span>
                         )}
                         {hasWant && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-xs"
+                            style={{ background: "var(--plan-100)", color: "var(--plan-700)" }}
+                          >
                             Want to go
                           </span>
                         )}
@@ -449,10 +466,20 @@ export default function MapPage() {
           onPhotoAreaClick={openExistingRecords}
         />
 
+        {prefectureId === null && !selectedMunicipality && (
+          <CoverageDotMatrix
+            prefecturesGeoJSON={prefecturesGeoJSONQuery.data ?? null}
+            visitedPrefectureIds={visitedPrefectureIds}
+            wantPrefectureIds={wantPrefectureIds}
+            mixedPrefectureIds={mixedPrefectureIds}
+          />
+        )}
+
         <button
           type="button"
           onClick={openNewEntry}
-          className="absolute bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-2xl text-white shadow-lg hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          className="absolute bottom-6 right-6 z-10 flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-lg"
+          style={{ background: "var(--accent)" }}
           aria-label="Add data"
           title="Add data"
         >
