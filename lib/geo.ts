@@ -80,3 +80,39 @@ export function geometryToSvgPath(
   }
   return "";
 }
+
+// Standard ray-casting point-in-ring test (even-odd rule).
+function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects =
+      yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+// [lng, lat] membership test against a Polygon/MultiPolygon, honoring holes
+// (a polygon's first ring is its shell, any further rings are holes cut out
+// of it) — used by the dot-matrix coverage panel to classify each sampled
+// point against a prefecture's real GADM geometry.
+export function pointInGeometry(
+  point: [number, number],
+  geometry: GeoJSON.Geometry,
+): boolean {
+  const [lng, lat] = point;
+  function inPolygon(rings: number[][][]): boolean {
+    if (rings.length === 0 || !pointInRing(lng, lat, rings[0])) return false;
+    for (let i = 1; i < rings.length; i++) {
+      if (pointInRing(lng, lat, rings[i])) return false;
+    }
+    return true;
+  }
+  if (geometry.type === "Polygon") return inPolygon(geometry.coordinates);
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((polygon) => inPolygon(polygon));
+  }
+  return false;
+}

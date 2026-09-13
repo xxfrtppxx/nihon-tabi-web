@@ -17,7 +17,9 @@ export default function VisitsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-bold">Your visits</h1>
+      <h1 className="mb-6 text-2xl font-extrabold tracking-tight">
+        Your visits
+      </h1>
 
       {visitsQuery.isLoading && <p>Loading...</p>}
       {visitsQuery.data?.length === 0 && (
@@ -30,11 +32,12 @@ export default function VisitsPage() {
         {visitsQuery.data?.map((visit) => (
           <li
             key={visit.id}
-            className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+            className="rounded-[var(--radius-lg)] border p-4"
+            style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold">
+                <p className="font-bold">
                   {placeName(visit.municipality.nameEn, visit.municipality.nameJa)}{" "}
                   <span className="text-sm font-normal text-neutral-500">
                     {placeName(
@@ -50,17 +53,20 @@ export default function VisitsPage() {
                 )}
               </div>
               <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase"
+                style={
                   visit.status === "visited"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                    : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                }`}
+                    ? { background: "var(--accent-100)", color: "var(--accent-700)" }
+                    : { background: "var(--plan-100)", color: "var(--plan-700)" }
+                }
               >
                 {visit.status === "visited" ? "Visited" : "Want to go"}
               </span>
             </div>
             {visit.rating ? (
-              <p className="mt-1 text-amber-500">{"★".repeat(visit.rating)}</p>
+              <p className="mt-1" style={{ color: "var(--accent)" }}>
+                {"★".repeat(visit.rating)}
+              </p>
             ) : null}
             {visit.note && <p className="mt-2 text-sm">{visit.note}</p>}
           </li>

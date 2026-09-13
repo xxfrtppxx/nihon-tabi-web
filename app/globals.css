@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/* Nihon Tabi Redesign v2 — pine-green accent + amber "planned" on warm
+   paper, softer radii. See design/Nihon Tabi Redesign v2.dc.html. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f4ef;
+  --surface: #ffffff;
+  --foreground: #1d2a2a;
+
+  --accent: #2f7d63;
+  --accent-100: #e7f1ec;
+  --accent-200: #cfe4db;
+  --accent-500: #3d9679;
+  --accent-600: #276b55;
+  --accent-700: #1d5343;
+
+  --plan: #c2871f;
+  --plan-100: #faf1e0;
+  --plan-700: #8a5f14;
+
+  --divider: rgba(29, 42, 42, 0.18);
+  --neutral-200: #ece9e2;
+  --neutral-300: #dbd7ce;
+  --neutral-400: #bdb8ad;
+  --neutral-500: #8f8b83;
+  --neutral-600: #6e6b64;
+  --neutral-700: #4e5350;
+  --neutral-800: #334340;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 18px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-accent: var(--accent);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-plan: var(--plan);
+  --color-plan-100: var(--plan-100);
+  --color-plan-700: var(--plan-700);
+  --font-sans: var(--font-archivo);
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1a2624;
+    --surface: #223330;
+    --foreground: #f7f4ef;
+    --divider: rgba(247, 244, 239, 0.22);
+    --neutral-200: #2a3a37;
+    --neutral-300: #33453f;
+    --neutral-400: #4c605a;
+    --neutral-500: #6e847d;
+    --neutral-600: #9aa3a0;
+    --neutral-700: #b6bdba;
+    --neutral-800: #dfe4e1;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }

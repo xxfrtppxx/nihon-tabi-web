@@ -30,7 +30,10 @@ const JAPAN_MAX_BOUNDS: [number, number, number, number] = [
 
 // No basemap — just a flat background. We only want our own boundary
 // polygons on screen, not OpenFreeMap's streets/labels underneath them.
-const MAP_BACKGROUND_COLOR = "#f8fafc";
+// Matches the app's warm-paper background token (--background in
+// app/globals.css) — kept as a literal here since maplibre's paint
+// properties can't read CSS custom properties.
+const MAP_BACKGROUND_COLOR = "#f7f4ef";
 
 const BLANK_STYLE: StyleSpecification = {
   version: 8,
@@ -56,13 +59,16 @@ const DETAIL_ZOOM = 6;
 // a real limit — it must never cut off prefectures actually on screen.
 const MAX_PREVIEW_PREFECTURES = 47;
 
-const VISITED_COLOR = "#22c55e";
-const WANT_COLOR = "#f59e0b";
-const NEUTRAL_COLOR = "#94a3b8";
+// Matches --accent / --plan / --neutral-400 in app/globals.css (pine-green
+// visited, amber want-to-go, warm neutral) — literal hex since maplibre
+// paint properties can't read CSS custom properties.
+const VISITED_COLOR = "#2f7d63";
+const WANT_COLOR = "#c2871f";
+const NEUTRAL_COLOR = "#bdb8ad";
 // Literal midpoint of VISITED_COLOR and WANT_COLOR — a place with both a
 // visit and a want-to-go plan gets this blended color rather than picking
 // one status to represent it.
-const MIXED_COLOR = "#8cb235";
+const MIXED_COLOR = "#79852e";
 
 // The flat municipality fill uses these same hex constants but at 45%
 // opacity over the map's background — so a solid-fill model card in the
@@ -297,13 +303,13 @@ export function MapView({
           <Layer
             id="prefectures-line"
             type="line"
-            paint={{ "line-color": "#334155", "line-width": 1 }}
+            paint={{ "line-color": "#334340", "line-width": 1 }}
           />
           <Layer
             id="prefectures-line-selected"
             type="line"
             filter={["==", ["get", "id"], selectedPrefectureId ?? -1]}
-            paint={{ "line-color": "#2563eb", "line-width": 3 }}
+            paint={{ "line-color": "#2f7d63", "line-width": 3 }}
           />
           <Layer
             id="prefectures-label"
@@ -315,8 +321,8 @@ export function MapView({
               "text-size": 13,
             }}
             paint={{
-              "text-color": "#1e293b",
-              "text-halo-color": "#f8fafc",
+              "text-color": "#334340",
+              "text-halo-color": "#f7f4ef",
               "text-halo-width": 1.5,
             }}
           />
@@ -351,7 +357,7 @@ export function MapView({
             id="preview-municipalities-line"
             type="line"
             minzoom={DETAIL_ZOOM}
-            paint={{ "line-color": "#1e293b", "line-width": 1 }}
+            paint={{ "line-color": "#334340", "line-width": 1 }}
           />
           <Layer
             id="preview-municipalities-label"
@@ -363,8 +369,8 @@ export function MapView({
               "text-size": 11,
             }}
             paint={{
-              "text-color": "#1e293b",
-              "text-halo-color": "#f8fafc",
+              "text-color": "#334340",
+              "text-halo-color": "#f7f4ef",
               "text-halo-width": 1.5,
             }}
           />
@@ -393,7 +399,7 @@ export function MapView({
           <Layer
             id="municipalities-line"
             type="line"
-            paint={{ "line-color": "#1e293b", "line-width": 1 }}
+            paint={{ "line-color": "#334340", "line-width": 1 }}
           />
           <Layer
             id="municipalities-label"
@@ -404,8 +410,8 @@ export function MapView({
               "text-size": 11,
             }}
             paint={{
-              "text-color": "#1e293b",
-              "text-halo-color": "#f8fafc",
+              "text-color": "#334340",
+              "text-halo-color": "#f7f4ef",
               "text-halo-width": 1.5,
             }}
           />
@@ -449,7 +455,7 @@ export function MapView({
                 filter: "drop-shadow(0 8px 8px rgba(0,0,0,0.4))",
               }}
             >
-              <path d={tiltedCard.path} fill={tiltedCard.color} stroke="#1e293b" strokeWidth={2} fillRule="evenodd" />
+              <path d={tiltedCard.path} fill={tiltedCard.color} stroke="#334340" strokeWidth={2} fillRule="evenodd" />
             </svg>
 
             {/* Visit photos pinned on top of the model, Google-Maps-style —
