@@ -26,29 +26,35 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadUser = useCallback(async () => {
-    if (!getAccessToken()) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-    try {
-      setUser(await usersApi.me());
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // No token means there's nothing to load — that's known synchronously at
+  // first render, so it's the lazy initial value rather than a setState
+  // an effect has to make. Only the "there is a token" case needs to stay
+  // loading while usersApi.me() resolves.
+  const [loading, setLoading] = useState(() => getAccessToken() !== null);
 
   useEffect(() => {
-    loadUser();
-    return subscribeTokens((tokens) => {
+    let ignore = false;
+    if (getAccessToken()) {
+      usersApi
+        .me()
+        .then((me) => {
+          if (!ignore) setUser(me);
+        })
+        .catch(() => {
+          if (!ignore) setUser(null);
+        })
+        .finally(() => {
+          if (!ignore) setLoading(false);
+        });
+    }
+    const unsubscribe = subscribeTokens((tokens) => {
       if (!tokens) setUser(null);
     });
-  }, [loadUser]);
+    return () => {
+      ignore = true;
+      unsubscribe();
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login({ email, password });
