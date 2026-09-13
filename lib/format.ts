@@ -12,3 +12,18 @@ export function formatDate(dateStr: string): string {
   const yyyy = date.getUTCFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Big-day-number / month-abbreviation split for the Timeline's editorial
+// row layout — UTC for the same reason as formatDate above.
+export function dayAndMonth(dateStr: string): { day: string; month: string } {
+  const date = new Date(dateStr);
+  return {
+    day: String(date.getUTCDate()).padStart(2, "0"),
+    month: MONTH_ABBR[date.getUTCMonth()],
+  };
+}
