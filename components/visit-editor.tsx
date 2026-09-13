@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,6 +13,7 @@ import {
   type VisitStatus,
 } from "@/lib/api";
 import { formatDate, placeName } from "@/lib/format";
+import { haversineKm } from "@/lib/geo";
 
 // Local calendar day, not UTC — the date picker limits should match what
 // the user considers "today" on their own device.
@@ -337,6 +338,53 @@ function VisitEntryForm({
     queryFn: () => geoApi.municipalities(pickerPrefectureId!),
     enabled: pickerPrefectureId !== null,
   });
+  // Already fetched (and cached) by the map page whenever the editor is
+  // opened from there — this just reuses that cache, no extra request in
+  // the common case.
+  const allVisitsQuery = useQuery({ queryKey: ["visits"], queryFn: () => visitsApi.list() });
+
+  // Recently logged cities, most-recent first, excluding whichever city is
+  // currently selected — a quick way to log a second record for a place
+  // you were just at without hunting through the prefecture/city selects.
+  const recentMunicipalities = useMemo(() => {
+    const byId = new Map<number, { municipality: Municipality; visitedOn: string | null }>();
+    for (const v of allVisitsQuery.data ?? []) {
+      if (v.municipalityId === municipality?.id) continue;
+      const existing = byId.get(v.municipalityId);
+      if (!existing || (v.visitedOn && (!existing.visitedOn || v.visitedOn > existing.visitedOn))) {
+        byId.set(v.municipalityId, { municipality: v.municipality, visitedOn: v.visitedOn });
+      }
+    }
+    return Array.from(byId.values())
+      .sort((a, b) => (b.visitedOn ?? "").localeCompare(a.visitedOn ?? ""))
+      .slice(0, 2)
+      .map((e) => e.municipality);
+  }, [allVisitsQuery.data, municipality?.id]);
+
+  // Other municipalities in the same prefecture, ranked by centroid
+  // distance from the currently selected one — "nearby" is scoped to the
+  // current prefecture rather than a nationwide search, since that's the
+  // data already on hand (no extra requests per keystroke).
+  const nearbyMunicipalities = useMemo(() => {
+    if (!municipality || municipality.centroidLat === null || municipality.centroidLng === null) {
+      return [];
+    }
+    const origin = { lat: municipality.centroidLat, lng: municipality.centroidLng };
+    return (municipalitiesQuery.data ?? [])
+      .filter(
+        (m): m is Municipality & { centroidLat: number; centroidLng: number } =>
+          m.id !== municipality.id && m.centroidLat !== null && m.centroidLng !== null,
+      )
+      .map((m) => ({ m, km: haversineKm(origin, { lat: m.centroidLat, lng: m.centroidLng }) }))
+      .sort((a, b) => a.km - b.km)
+      .slice(0, 2)
+      .map((e) => e.m);
+  }, [municipality, municipalitiesQuery.data]);
+
+  function selectSuggestion(m: Municipality) {
+    setPickerPrefectureId(m.prefectureId);
+    onMunicipalityChange(m);
+  }
   const [visitId, setVisitId] = useState<string | null>(existingVisit?.id ?? null);
   const [status, setStatus] = useState<VisitStatus>(
     existingVisit?.status ?? "visited",
@@ -504,6 +552,33 @@ function VisitEntryForm({
           </select>
         </label>
       </div>
+
+      {!municipalityLocked && (recentMunicipalities.length > 0 || nearbyMunicipalities.length > 0) && (
+        <div className="-mt-2 flex flex-wrap gap-1.5">
+          {recentMunicipalities.map((m) => (
+            <button
+              key={`recent-${m.id}`}
+              type="button"
+              onClick={() => selectSuggestion(m)}
+              className="rounded-full border px-2.5 py-1 text-xs whitespace-nowrap"
+              style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+            >
+              Recent · {m.nameEn} {m.nameJa}
+            </button>
+          ))}
+          {nearbyMunicipalities.map((m) => (
+            <button
+              key={`nearby-${m.id}`}
+              type="button"
+              onClick={() => selectSuggestion(m)}
+              className="rounded-full border px-2.5 py-1 text-xs whitespace-nowrap"
+              style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+            >
+              Nearby · {m.nameEn} {m.nameJa}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2">
         {(
