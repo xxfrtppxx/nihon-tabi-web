@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { statsApi } from "@/lib/api";
 
 const APP_VERSION = "v0.2.0";
 
@@ -16,6 +18,7 @@ const TABS = [
 export function NavBar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const statsQuery = useQuery({ queryKey: ["stats"], queryFn: statsApi.me, enabled: !!user });
 
   if (!user) return null;
 
@@ -68,6 +71,11 @@ export function NavBar() {
         className="flex flex-none items-center gap-3 border-l px-4 text-sm sm:gap-5 sm:px-6"
         style={{ borderColor: "var(--divider)" }}
       >
+        {statsQuery.data && (
+          <span className="hidden text-xs tabular-nums whitespace-nowrap text-neutral-600 md:inline">
+            {statsQuery.data.visitedCount} visited · {statsQuery.data.wantToGoCount} planned
+          </span>
+        )}
         <span className="hidden text-xs font-semibold tracking-wide whitespace-nowrap text-neutral-500 uppercase sm:inline">
           {user.displayName}
         </span>

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { geoApi, geoFilesApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
+import { geoApi, geoFilesApi, statsApi, visitsApi, type Municipality, type Visit } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { placeName } from "@/lib/format";
 import { boundsOfFeatureCollection, boundsOfGeometry, type LngLatBounds } from "@/lib/geo";
@@ -52,6 +52,8 @@ export default function MapPage() {
     queryFn: () => visitsApi.list(),
     enabled: !!user,
   });
+
+  const statsQuery = useQuery({ queryKey: ["stats"], queryFn: statsApi.me, enabled: !!user });
 
   const prefecturesGeoJSONQuery = useQuery({
     queryKey: ["geo-files", "prefectures"],
@@ -141,6 +143,28 @@ export default function MapPage() {
     const wantSet = new Set(wantPrefectureIds);
     return Array.from(new Set(visitedPrefectureIds.filter((id) => wantSet.has(id))));
   }, [visitedPrefectureIds, wantPrefectureIds]);
+
+  // Distinct visited-municipality count per prefecture, for the sidebar's
+  // per-row count + progress bar. The bar is relative to whichever
+  // prefecture has the most (not visited/total municipalities — that would
+  // need fetching every prefecture's municipality list up front), so it
+  // reads as "how much of your travel is concentrated here" rather than
+  // "how complete is this prefecture."
+  const visitedMunicipalityCountByPrefecture = useMemo(() => {
+    const counts = new Map<number, Set<number>>();
+    for (const v of visitsQuery.data ?? []) {
+      if (v.status !== "visited") continue;
+      const prefId = v.municipality.prefectureId;
+      const set = counts.get(prefId) ?? new Set<number>();
+      set.add(v.municipalityId);
+      counts.set(prefId, set);
+    }
+    return new Map(Array.from(counts, ([prefId, set]) => [prefId, set.size]));
+  }, [visitsQuery.data]);
+  const maxVisitedMunicipalityCount = Math.max(
+    1,
+    ...Array.from(visitedMunicipalityCountByPrefecture.values()),
+  );
 
   const prefecturesGeoJSONWithNames = useMemo(() => {
     const geojson = prefecturesGeoJSONQuery.data;
@@ -344,16 +368,34 @@ export default function MapPage() {
               <p className="text-sm text-neutral-500">No matching prefectures</p>
             )}
             <ul className="flex flex-col gap-1">
-              {filteredPrefectures.map((pref) => (
-                <li key={pref.id}>
-                  <button
-                    onClick={() => selectPrefecture(pref.id)}
-                    className="w-full rounded-[var(--radius-sm)] px-3 py-1.5 text-left text-sm hover:bg-[var(--accent-100)]"
-                  >
-                    {placeName(pref.nameEn, pref.nameJa)}
-                  </button>
-                </li>
-              ))}
+              {filteredPrefectures.map((pref) => {
+                const count = visitedMunicipalityCountByPrefecture.get(pref.id) ?? 0;
+                return (
+                  <li key={pref.id}>
+                    <button
+                      onClick={() => selectPrefecture(pref.id)}
+                      className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-sm)] px-3 py-1.5 text-left text-sm hover:bg-[var(--accent-100)]"
+                    >
+                      <span>{placeName(pref.nameEn, pref.nameJa)}</span>
+                      <span className="flex flex-none items-center gap-2">
+                        <span className="text-xs tabular-nums text-neutral-500">{count}</span>
+                        <span
+                          className="block h-1.5 w-11 rounded-full"
+                          style={{ background: "var(--neutral-200)" }}
+                        >
+                          <span
+                            className="block h-1.5 rounded-full"
+                            style={{
+                              background: "var(--accent)",
+                              width: `${(count / maxVisitedMunicipalityCount) * 100}%`,
+                            }}
+                          />
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : (
@@ -468,12 +510,60 @@ export default function MapPage() {
         />
 
         {prefectureId === null && !selectedMunicipality && (
-          <CoverageDotMatrix
-            prefecturesGeoJSON={prefecturesGeoJSONQuery.data ?? null}
-            visitedPrefectureIds={visitedPrefectureIds}
-            wantPrefectureIds={wantPrefectureIds}
-            mixedPrefectureIds={mixedPrefectureIds}
-          />
+          <>
+            <CoverageDotMatrix
+              prefecturesGeoJSON={prefecturesGeoJSONQuery.data ?? null}
+              visitedPrefectureIds={visitedPrefectureIds}
+              wantPrefectureIds={wantPrefectureIds}
+              mixedPrefectureIds={mixedPrefectureIds}
+            />
+
+            <div
+              className="pointer-events-none absolute left-6 top-6 z-10 rounded-[var(--radius-md)] px-4 py-3.5"
+              style={{ background: "var(--background)", border: "1px solid var(--divider)" }}
+            >
+              <div className="mb-2.5 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
+                Legend
+              </div>
+              <div className="flex flex-col gap-1.5 text-xs font-medium">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="block h-2.5 w-2.5 rounded-[3px]"
+                    style={{ background: "var(--accent)" }}
+                  />
+                  Visited
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="block h-2.5 w-2.5 rounded-[3px] border"
+                    style={{ borderColor: "var(--divider)" }}
+                  />
+                  Want to go
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="block h-2.5 w-2.5 rounded-[3px]"
+                    style={{ background: "var(--neutral-300)" }}
+                  />
+                  Not yet
+                </div>
+              </div>
+            </div>
+
+            {statsQuery.data && (
+              <div
+                className="absolute bottom-6 right-24 z-10 rounded-[var(--radius-md)] px-4 py-3"
+                style={{ background: "var(--background)", border: "1px solid var(--divider)" }}
+              >
+                <div className="text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
+                  Coverage
+                </div>
+                <div className="mt-1.5 text-[30px] leading-none font-extrabold tabular-nums">
+                  {statsQuery.data.percentageVisited}%
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <button
