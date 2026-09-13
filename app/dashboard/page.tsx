@@ -4,7 +4,14 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { geoApi, geoFilesApi, statsApi, visitsApi } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { DotMatrixSvg, useDotMatrix } from "@/components/coverage-dot-matrix";
+import { DotMapFill, type DotStatus } from "@/components/dot-map";
+
+// See app/map/page.tsx's COUNTRY_DOT_BOUNDS for why this excludes the
+// prefecture data's true (Minami-Torishima-stretched) bbox.
+const COUNTRY_DOT_BOUNDS: [[number, number], [number, number]] = [
+  [122.7, 24.0],
+  [148.9, 45.7],
+];
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
@@ -51,12 +58,13 @@ export default function DashboardPage() {
     return visitedPrefectureIds.filter((id) => wantSet.has(id));
   }, [visitedPrefectureIds, wantPrefectureIds]);
 
-  const dots = useDotMatrix({
-    prefecturesGeoJSON: prefecturesGeoJSONQuery.data ?? null,
-    visitedPrefectureIds,
-    wantPrefectureIds,
-    mixedPrefectureIds,
-  });
+  const classify = useMemo(() => {
+    const visited = new Set(visitedPrefectureIds);
+    const want = new Set(wantPrefectureIds);
+    const mixed = new Set(mixedPrefectureIds);
+    return (id: number): DotStatus =>
+      mixed.has(id) ? "mixed" : visited.has(id) ? "visited" : want.has(id) ? "want_to_go" : "none";
+  }, [visitedPrefectureIds, wantPrefectureIds, mixedPrefectureIds]);
 
   // Real visit counts per calendar year, from the same data the Timeline
   // shows — not a fabricated series.
@@ -110,62 +118,86 @@ export default function DashboardPage() {
   const stats = statsQuery.data;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-extrabold tracking-tight">
-        Your Japan travel stats
-      </h1>
-
-      {statsQuery.isLoading && <p>Loading...</p>}
+    <div className="flex h-[calc(100vh-57px)]" style={{ background: "var(--background)" }}>
+      {statsQuery.isLoading && (
+        <p className="p-8">Loading...</p>
+      )}
 
       {stats && (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_280px]">
-          <div>
-            <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-[var(--radius-lg)] p-4 text-center" style={{ background: "var(--neutral-200)" }}>
-                <p className="text-2xl font-extrabold">{stats.visitedCount}</p>
-                <p className="text-sm text-neutral-500">Visited</p>
+        <>
+          <div
+            className="flex flex-[2] flex-col border-r"
+            style={{ borderColor: "var(--divider)" }}
+          >
+            <div
+              className="grid flex-none grid-cols-4 border-b"
+              style={{ borderColor: "var(--divider)" }}
+            >
+              <div className="border-r px-6 py-6" style={{ borderColor: "var(--neutral-300)" }}>
+                <p className="text-[40px] leading-[0.86] font-extrabold tracking-tight tabular-nums">
+                  {stats.visitedCount}
+                </p>
+                <p className="mt-2.5 text-[11px] font-semibold tracking-wide text-neutral-600 uppercase">
+                  Visited
+                </p>
               </div>
-              <div className="rounded-[var(--radius-lg)] p-4 text-center" style={{ background: "var(--neutral-200)" }}>
-                <p className="text-2xl font-extrabold">{stats.wantToGoCount}</p>
-                <p className="text-sm text-neutral-500">Want to go</p>
+              <div className="border-r px-6 py-6" style={{ borderColor: "var(--neutral-300)" }}>
+                <p className="text-[40px] leading-[0.86] font-extrabold tracking-tight tabular-nums">
+                  {stats.wantToGoCount}
+                </p>
+                <p className="mt-2.5 text-[11px] font-semibold tracking-wide text-neutral-600 uppercase">
+                  Want to go
+                </p>
               </div>
-              <div className="rounded-[var(--radius-lg)] p-4 text-center" style={{ background: "var(--neutral-200)" }}>
-                <p className="text-2xl font-extrabold">{visitedPrefectureIds.length}</p>
-                <p className="text-sm text-neutral-500">Prefectures</p>
+              <div className="border-r px-6 py-6" style={{ borderColor: "var(--neutral-300)" }}>
+                <p className="text-[40px] leading-[0.86] font-extrabold tracking-tight tabular-nums">
+                  {visitedPrefectureIds.length}
+                </p>
+                <p className="mt-2.5 text-[11px] font-semibold tracking-wide text-neutral-600 uppercase">
+                  Prefectures
+                </p>
               </div>
-              <div className="rounded-[var(--radius-lg)] p-4 text-center text-white" style={{ background: "var(--accent)" }}>
-                <p className="text-2xl font-extrabold">{stats.percentageVisited}%</p>
-                <p className="text-sm opacity-90">of all Japan</p>
+              <div className="px-6 py-6 text-white" style={{ background: "var(--accent)" }}>
+                <p className="text-[40px] leading-[0.86] font-extrabold tracking-tight tabular-nums">
+                  {stats.percentageVisited}%
+                </p>
+                <p className="mt-2.5 text-[11px] font-semibold tracking-wide uppercase">
+                  Of all Japan
+                </p>
               </div>
             </div>
 
             {stats.totalMunicipalities === 0 ? (
-              <p className="text-neutral-500">
+              <p className="p-6 text-neutral-500">
                 No municipality data yet (waiting on the GADM seed). Stats will be
                 fully available after that.
               </p>
             ) : (
-              <div className="flex flex-col gap-8">
+              <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
                 <div>
-                  <h2 className="mb-3 text-sm font-semibold text-neutral-500">By region</h2>
-                  <ul className="flex flex-col gap-2">
+                  <div className="mb-3.5 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
+                    By region
+                  </div>
+                  <ul className="flex flex-col">
                     {stats.byRegion.map((r) => (
-                      <li key={r.region}>
-                        <div className="mb-1 flex justify-between text-sm">
-                          <span>{r.region}</span>
-                          <span className="tabular-nums">
-                            {r.visited}/{r.total}
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--neutral-200)" }}>
-                          <div
-                            className="h-full rounded-full"
+                      <li
+                        key={r.region}
+                        className="grid grid-cols-[150px_1fr_84px] items-center gap-4 border-b py-2"
+                        style={{ borderColor: "var(--neutral-300)" }}
+                      >
+                        <span className="text-[13px] font-semibold">{r.region}</span>
+                        <span className="block h-3.5 overflow-hidden rounded-full" style={{ background: "var(--neutral-200)" }}>
+                          <span
+                            className="block h-3.5 rounded-full"
                             style={{
                               background: "var(--accent)",
                               width: `${r.total > 0 ? (r.visited / r.total) * 100 : 0}%`,
                             }}
                           />
-                        </div>
+                        </span>
+                        <span className="text-right text-xs font-medium tabular-nums text-neutral-600">
+                          {r.visited}/{r.total}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -173,7 +205,9 @@ export default function DashboardPage() {
 
                 {perYear.length > 0 && (
                   <div>
-                    <h2 className="mb-3 text-sm font-semibold text-neutral-500">Records per year</h2>
+                    <div className="mb-3.5 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
+                      Records per year
+                    </div>
                     <div className="flex h-28 items-end gap-3">
                       {perYear.map((y) => (
                         <div key={y.year} className="flex h-full flex-1 flex-col items-stretch justify-end">
@@ -181,14 +215,16 @@ export default function DashboardPage() {
                             {y.count}
                           </span>
                           <span
-                            className="block rounded-t-[var(--radius-sm)]"
+                            className="block"
                             style={{
                               background: "var(--accent)",
                               height: `${(y.count / y.max) * 100}%`,
                               minHeight: 4,
                             }}
                           />
-                          <span className="mt-2 text-center text-xs text-neutral-500">{y.year}</span>
+                          <span className="mt-2 text-center text-xs font-semibold tracking-wide text-neutral-600 uppercase">
+                            {y.year}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -198,32 +234,27 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-6">
-            {dots.length > 0 && (
-              <div
-                className="rounded-[var(--radius-md)] p-4"
-                style={{ background: "var(--surface)", border: "1px solid var(--divider)" }}
-              >
-                <div className="mb-3 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
-                  Coverage
-                </div>
-                <DotMatrixSvg dots={dots} size={200} />
-              </div>
-            )}
-
+          <div className="flex w-[420px] flex-none flex-col">
+            <div className="relative flex-1 border-b" style={{ borderColor: "var(--divider)" }}>
+              <DotMapFill
+                className="absolute inset-0"
+                geojson={prefecturesGeoJSONQuery.data ?? null}
+                bounds={COUNTRY_DOT_BOUNDS}
+                classify={classify}
+                cols={50}
+                rows={50}
+              />
+            </div>
             {longestGap && (
-              <div
-                className="rounded-[var(--radius-md)] p-4"
-                style={{ background: "var(--surface)", border: "1px solid var(--divider)" }}
-              >
-                <div className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
+              <div className="p-6">
+                <div className="mb-3 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
                   Longest gap
                 </div>
-                <p className="text-lg font-extrabold">
+                <p className="text-[22px] leading-[1.1] font-extrabold">
                   {longestGap.region} — {longestGap.years} year{longestGap.years === 1 ? "" : "s"}
                 </p>
                 {longestGap.neverLoggedCount > 0 && (
-                  <p className="mt-2 text-sm text-neutral-600">
+                  <p className="mt-2.5 text-sm text-neutral-600">
                     {longestGap.neverLoggedCount} prefecture
                     {longestGap.neverLoggedCount === 1 ? "" : "s"} there{" "}
                     {longestGap.neverLoggedCount === 1 ? "has" : "have"} never been logged.
@@ -232,8 +263,8 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
-    </main>
+    </div>
   );
 }

@@ -153,7 +153,7 @@ export default function VisitsPage() {
                       <div className="flex flex-wrap items-baseline gap-2">
                         <h3 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                           <Link
-                            href={`/city/${visit.municipality.prefectureId}/${visit.municipality.id}`}
+                            href={`/city/${visit.municipality.id}?prefectureId=${visit.municipality.prefectureId}`}
                             className="hover:underline"
                           >
                             {visit.municipality.nameEn}

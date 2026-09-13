@@ -30,6 +30,12 @@
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 18px;
+
+  /* Dot-matrix map: kept separate from --neutral-400/--divider because tiny
+     1-2px dots and thin coastline strokes need more contrast against the
+     background than those tokens give larger UI elements (borders, text). */
+  --dot-dim: #a39d8f;
+  --dot-coast: #b6bdba;
 }
 
 @theme inline {
@@ -62,6 +68,9 @@
     --neutral-600: #9aa3a0;
     --neutral-700: #b6bdba;
     --neutral-800: #dfe4e1;
+
+    --dot-dim: #6f8880;
+    --dot-coast: #4c5f59;
   }
 }
 

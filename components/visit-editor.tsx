@@ -394,8 +394,26 @@ function VisitEntryForm({
   const [rating, setRating] = useState(existingVisit?.rating ?? 0);
   const [photos, setPhotos] = useState<VisitPhoto[]>(existingVisit?.photos ?? []);
   const [photoError, setPhotoError] = useState(false);
+  const [savingAnother, setSavingAnother] = useState(false);
+  const [whereOpen, setWhereOpen] = useState(false);
+  const [whereQuery, setWhereQuery] = useState("");
   const dateInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedPrefectureForDisplay = prefecturesQuery.data?.find(
+    (p) => p.id === (municipality?.prefectureId ?? pickerPrefectureId),
+  );
+  function matchesWhere(nameEn: string, nameJa: string) {
+    const q = whereQuery.trim();
+    if (!q) return true;
+    return nameEn.toLowerCase().includes(q.toLowerCase()) || nameJa.includes(q);
+  }
+  const prefectureOptions = (prefecturesQuery.data ?? []).filter((p) =>
+    matchesWhere(p.nameEn, p.nameJa),
+  );
+  const municipalityOptions = (municipalitiesQuery.data ?? []).filter((m) =>
+    matchesWhere(m.nameEn, m.nameJa),
+  );
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["visits"] });
@@ -463,6 +481,28 @@ function VisitEntryForm({
     },
   });
 
+  // Saves the current record, same as the Save button, but resets the form
+  // for a fresh entry instead of closing — for logging several places (or
+  // several dates for the same place) in one sitting.
+  async function handleSaveAndAddAnother() {
+    if (!municipality) return;
+    setSavingAnother(true);
+    try {
+      if (visitId) await visitsApi.update(visitId, currentData());
+      else await visitsApi.create({ municipalityId: municipality.id, ...currentData() });
+      invalidate();
+      setVisitId(null);
+      setStatus("visited");
+      setVisitedOn("");
+      setNote("");
+      setRating(0);
+      setPhotos([]);
+      setPhotoError(false);
+    } finally {
+      setSavingAnother(false);
+    }
+  }
+
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
       const id = await ensureVisitId();
@@ -509,48 +549,96 @@ function VisitEntryForm({
         </button>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          Prefecture
-          <select
-            value={pickerPrefectureId ?? ""}
+      <div className="relative">
+        <label className="flex flex-col gap-1 text-sm">
+          Where
+          <input
+            type="text"
             disabled={municipalityLocked}
-            onChange={(e) => setPickerPrefectureId(Number(e.target.value))}
-            className="rounded-[var(--radius-md)] border px-3 py-2 disabled:opacity-60"
-            style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
-          >
-            <option value="" disabled>
-              Select prefecture
-            </option>
-            {prefecturesQuery.data?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {placeName(p.nameEn, p.nameJa)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          City / district
-          <select
-            value={municipality?.id ?? ""}
-            disabled={municipalityLocked || pickerPrefectureId === null}
-            onChange={(e) => {
-              const m = municipalitiesQuery.data?.find((m) => m.id === Number(e.target.value));
-              if (m) onMunicipalityChange(m);
+            value={
+              whereOpen
+                ? whereQuery
+                : municipality
+                  ? `${placeName(municipality.nameEn, municipality.nameJa)}${
+                      selectedPrefectureForDisplay
+                        ? ` — ${placeName(selectedPrefectureForDisplay.nameEn, selectedPrefectureForDisplay.nameJa)}`
+                        : ""
+                    }`
+                  : whereQuery
+            }
+            onChange={(e) => setWhereQuery(e.target.value)}
+            onFocus={() => {
+              setWhereOpen(true);
+              setWhereQuery("");
             }}
-            className="rounded-[var(--radius-md)] border px-3 py-2 disabled:opacity-60"
+            onBlur={() => setTimeout(() => setWhereOpen(false), 150)}
+            placeholder="Search prefecture or city"
+            className="rounded-[var(--radius-md)] border px-3 py-2 font-semibold disabled:opacity-60"
             style={{ borderColor: "var(--divider)", background: "var(--surface)" }}
-          >
-            <option value="" disabled>
-              Select city/district
-            </option>
-            {municipalitiesQuery.data?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {placeName(m.nameEn, m.nameJa)}
-              </option>
-            ))}
-          </select>
+          />
         </label>
+
+        {whereOpen && !municipalityLocked && (
+          <div
+            className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-[var(--radius-md)] border py-1"
+            style={{ borderColor: "var(--divider)", background: "var(--surface)", boxShadow: "var(--shadow-lg, 0 8px 24px rgba(29,42,42,.18))" }}
+          >
+            {pickerPrefectureId === null ? (
+              prefectureOptions.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-neutral-500">No matching prefectures</p>
+              ) : (
+                prefectureOptions.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setPickerPrefectureId(p.id);
+                      setWhereQuery("");
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent-100)]"
+                  >
+                    {placeName(p.nameEn, p.nameJa)}
+                  </button>
+                ))
+              )
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setPickerPrefectureId(null);
+                    setWhereQuery("");
+                  }}
+                  className="block w-full px-3 py-2 text-left text-xs font-semibold hover:underline"
+                  style={{ color: "var(--accent)" }}
+                >
+                  ← All prefectures
+                </button>
+                {municipalityOptions.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-neutral-500">No matching cities</p>
+                ) : (
+                  municipalityOptions.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onMunicipalityChange(m);
+                        setWhereQuery("");
+                        setWhereOpen(false);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent-100)]"
+                    >
+                      {placeName(m.nameEn, m.nameJa)}
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {!municipalityLocked && (recentMunicipalities.length > 0 || nearbyMunicipalities.length > 0) && (
@@ -723,6 +811,15 @@ function VisitEntryForm({
           style={{ background: "var(--accent)" }}
         >
           {saveMutation.isPending ? "Saving..." : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveAndAddAnother}
+          disabled={savingAnother || !municipality}
+          className="rounded-[var(--radius-md)] border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+        >
+          {savingAnother ? "Saving..." : "Save & add another"}
         </button>
         {visitId && (
           <button

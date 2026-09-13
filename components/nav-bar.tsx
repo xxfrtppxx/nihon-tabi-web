@@ -6,8 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { statsApi } from "@/lib/api";
 
-const APP_VERSION = "v0.2.0";
-
 const TABS = [
   { href: "/map", label: "Atlas" },
   { href: "/visits", label: "Timeline" },
@@ -18,7 +16,11 @@ const TABS = [
 export function NavBar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const statsQuery = useQuery({ queryKey: ["stats"], queryFn: statsApi.me, enabled: !!user });
+  const statsQuery = useQuery({
+    queryKey: ["stats"],
+    queryFn: statsApi.me,
+    enabled: !!user,
+  });
 
   if (!user) return null;
 
@@ -36,12 +38,6 @@ export function NavBar() {
         </span>
         <span className="hidden text-[13px] font-medium whitespace-nowrap text-neutral-500 sm:inline">
           日本旅
-        </span>
-        <span
-          className="ml-1 hidden rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide whitespace-nowrap sm:inline-block"
-          style={{ background: "var(--accent-100)", color: "var(--accent-700)" }}
-        >
-          {APP_VERSION}
         </span>
       </div>
 
@@ -72,7 +68,7 @@ export function NavBar() {
         style={{ borderColor: "var(--divider)" }}
       >
         {statsQuery.data && (
-          <span className="hidden text-xs tabular-nums whitespace-nowrap text-neutral-600 md:inline">
+          <span className="hidden text-xs font-medium tabular-nums whitespace-nowrap text-neutral-600 sm:inline">
             {statsQuery.data.visitedCount} visited · {statsQuery.data.wantToGoCount} planned
           </span>
         )}

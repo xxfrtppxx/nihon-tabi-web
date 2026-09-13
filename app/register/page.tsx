@@ -54,6 +54,7 @@ export default function RegisterPage() {
           <span className="h-3 w-3 bg-white" />
           <span className="h-3 w-3 border-2 border-white box-border" />
           <span className="h-3 w-3 bg-white/40" />
+          <span className="h-3 w-3 bg-white/40" />
         </div>
       </div>
 

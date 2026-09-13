@@ -101,6 +101,7 @@ export interface Prefecture {
   region: string;
   centroidLat: number | null;
   centroidLng: number | null;
+  municipalityCount: number;
 }
 
 export interface Municipality {

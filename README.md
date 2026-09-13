@@ -5,7 +5,6 @@ Web app (Next.js) สำหรับบันทึกการท่องเ�
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript, React 19
-- MapLibre GL JS (`react-map-gl/maplibre`) — แผนที่ฐาน (basemap: OpenFreeMap, ฟรีไม่ต้องใช้ API key)
 - Tailwind CSS v4
 - TanStack Query — data fetching/cache จาก `nihon-tabi-api`
 - Auth: access token เก็บใน `localStorage`, refresh token เก็บใน httpOnly cookie (ตั้งโดย `nihon-tabi-api`, `path=/auth`, JS อ่านไม่ได้) — client-side ทั้งหมด ไม่มี server session
@@ -17,12 +16,14 @@ app/
   layout.tsx / providers.tsx   -- root layout, QueryClientProvider + AuthProvider
   page.tsx                      -- redirect ตาม auth state (/map หรือ /login)
   login/, register/             -- ฟอร์ม auth
-  map/                           -- หน้าหลัก: เลือกจังหวัด → เมือง (list) + แผนที่ + VisitEditor
+  map/                           -- หน้าหลัก: เลือกจังหวัด → เมือง (list) + dot-matrix map + VisitEditor
+  city/[id]/                     -- หน้ารายละเอียดเมือง (records, รูปทั้งหมด, nearby)
+  trips/                         -- ตัวอย่าง trip แบบ static (ยังไม่มี backend)
   visits/                        -- รายการที่ไปแล้ว/อยากไป
   dashboard/                     -- สถิติ (% ที่ไปแล้ว, แยกตาม region)
 components/
   nav-bar.tsx
-  map-view.tsx                   -- MapLibre wrapper (dynamic import, ssr:false)
+  dot-map.tsx                     -- dot-matrix map primitive (useDotGrid + DotMapSvg/DotMapFill) — ใช้ทั้งใน Atlas, city page, dashboard, trips
   visit-editor.tsx                -- modal สร้าง/แก้/ลบ visit
 lib/
   api.ts                          -- fetch client (credentials: "include" ทุก request) + endpoint functions ทั้งหมด (auth/geo/visits/stats)
@@ -36,13 +37,9 @@ hooks/
 
 ทดสอบผ่านเบราว์เซอร์จริงแล้วครบ flow: register → login → เลือกจังหวัด/เมือง ผ่าน sidebar แบบ drill-down พร้อม search → mark visited/want_to_go พร้อมวันที่/โน้ต/rating/รูปถ่าย → รายการที่ไปแล้ว → dashboard สถิติ → logout → auth guard เด้งกลับ /login ถูกต้อง
 
-แผนที่แสดง polygon จริงของจังหวัด/เมือง (จาก GADM ผ่าน `nihon-tabi-api`) พร้อมสีตามสถานะ visited/want_to_go (ผสมสีถ้ามีทั้งสองสถานะในที่เดียวกัน), fit ขอบเขตอัตโนมัติเมื่อเลือกจังหวัด/เมือง, ล็อค pan/zoom ให้อยู่ในขอบเขตญี่ปุ่น
+Atlas เป็น dot-matrix ล้วน (ตาม redesign v2 — ดู `../Nihon Tabi Redesign v2.dc.html`) แทนแผนที่ MapLibre แบบโต้ตอบได้จริงแบบเดิม: `components/dot-map.tsx` สุ่มจุดกริดจาก GeoJSON จริง (จาก GADM ผ่าน `nihon-tabi-api`) แล้ววาดเป็น SVG จุดสี่เหลี่ยมเล็กๆ ไล่สีตามสถานะ visited/want_to_go/mixed — `DotMapFill` วัดขนาดกล่องตัวเองผ่าน ResizeObserver แล้ว fit ให้เต็มพื้นที่จริง (ไม่ใช่ square เท่ากันทุกด้าน) การเลือกจังหวัด/เมืองทำผ่าน sidebar list เท่านั้น ไม่มีคลิกลงบนแผนที่โดยตรงอีกต่อไป
 
-คลิกเลือกเมืองบนแผนที่ไม่เปิด modal แก้ไขข้อมูลโดยตรงอีกต่อไป — แสดงเป็น preview บนแผนที่แทน: การ์ด polygon เอียงคล้ายโมเดล 3D (`components/map-view.tsx`, วาดจาก GeoJSON เป็น SVG แล้วเอียงด้วย CSS transform) ถ้ายังไม่มีข้อมูล, หรือรูปถ่ายสไตล์โพลารอยด์กระจายอยู่ในพื้นที่ (ผ่าน MapLibre `Marker`) ถ้ามี visit ที่มีรูปแล้ว — คลิกการ์ด/รูปเพื่อเปิด editor (สร้างใหม่/ดูรายการเดิม) ปุ่ม "+" ลอยมุมล่างขวาเปิด editor สร้างใหม่ได้ตลอดโดยไม่ต้องเลือกเมืองก่อน (มีช่องเลือกจังหวัด/เมืองในฟอร์มเอง — จะ disable ถ้าเปิดมาจากเมืองที่เลือกไว้แล้วบนแผนที่)
-
-### หมายเหตุเรื่อง maplibre-gl เวอร์ชัน
-
-ตอนแรกลองใช้ `maplibre-gl@6.x` (ล่าสุดตอนเขียน) แล้วเจอบั๊ก: raster background layer ขึ้น แต่ vector tile layer (ถนน/เมือง/label) ไม่โหลดเลยไม่ว่าจะใช้ Turbopack หรือ webpack dev server — เป็นปัญหาของตัว library เอง ไม่เกี่ยวกับโค้ดเรา จึงปักหมุดไว้ที่ `maplibre-gl@5.24.0` (เสถียร ใช้งานได้ปกติ) แทน ถ้าจะอัปเป็น v6 ในอนาคตต้องทดสอบ vector tile loading ให้ดีก่อน
+เลือกเมืองในหน้า Atlas จะโชว์กล่องข้อมูลลอยมุมล่างซ้าย (แถบรูป 3 รูป + ชื่อเมือง + โน้ตล่าสุด + ปุ่ม "Open city"/"Add record") แทนการเปิด modal ตรงๆ — "Open city" พาไปหน้า `app/city/[id]/page.tsx` (records ทั้งหมด, รูปทั้งหมด, nearby ที่ยังไม่ได้ไป), "Add record" เปิด `VisitEditor`
 
 ## Setup
 
