@@ -143,12 +143,9 @@ export function CoverageDotMatrix(props: {
 
   return (
     <div
-      className="pointer-events-none absolute left-6 top-6 z-10 rounded-[var(--radius-md)] px-3 py-3"
+      className="pointer-events-none absolute right-6 top-6 z-10 rounded-[var(--radius-md)] px-3 py-3"
       style={{ background: "var(--background)", border: "1px solid var(--divider)" }}
     >
-      <div className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-neutral-600 uppercase">
-        Coverage
-      </div>
       <DotMatrixSvg dots={dots} />
     </div>
   );
